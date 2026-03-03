@@ -21,6 +21,9 @@
 
   <PropertyGroup>
     <DefineConstants>$(DefineConstants);MACOS</DefineConstants>
+    <UsePrebuiltContent Condition="'$(UsePrebuiltContent)' == ''">false</UsePrebuiltContent>
+    <HasWine Condition="'$(HasWine)' == ''">unknown</HasWine>
+    <PrebuiltContentDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../Client.Main/MGContent/PrebuiltContent/DesktopGL/Content'))</PrebuiltContentDir>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
@@ -41,11 +44,47 @@
     <TrimmerRootAssembly Include="mscorlib" />
   </ItemGroup>
 
-    <ItemGroup>
+  <ItemGroup Condition="'$(UsePrebuiltContent)' != 'true'">
     <MonoGameContentReference Include="..\Client.Main\MGContent\Content.mgcb">
       <Link>Content\Content.mgcb</Link>
     </MonoGameContentReference>
   </ItemGroup>
+
+  <ItemGroup Condition="'$(UsePrebuiltContent)' == 'true'">
+    <Content Include="$(PrebuiltContentDir)/**/*.xnb">
+      <Link>Content/%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
+  <Target Name="DetectWine"
+          BeforeTargets="PrepareForBuild"
+          Condition="'$(OS)' != 'Windows_NT' and '$(UsePrebuiltContent)' != 'true'">
+    <Exec Command="command -v wine >/dev/null 2&gt;&amp;1" IgnoreExitCode="true">
+      <Output TaskParameter="ExitCode" PropertyName="WineProbeExitCode" />
+    </Exec>
+    <PropertyGroup>
+      <HasWine Condition="'$(WineProbeExitCode)' == '0'">true</HasWine>
+      <HasWine Condition="'$(WineProbeExitCode)' != '0'">false</HasWine>
+      <UsePrebuiltContent Condition="'$(HasWine)' != 'true'">true</UsePrebuiltContent>
+    </PropertyGroup>
+    <Message Text="[MuMac] wine detected: $(HasWine). UsePrebuiltContent=$(UsePrebuiltContent)" Importance="High" />
+  </Target>
+
+  <Target Name="ValidatePrebuiltContent"
+          BeforeTargets="PrepareForBuild"
+          Condition="'$(UsePrebuiltContent)' == 'true'">
+    <Error Condition="!Exists('$(PrebuiltContentDir)')"
+           Text="[MuMac] Prebuilt content folder not found: $(PrebuiltContentDir). Generate DesktopGL .xnb assets first or build with wine available." />
+    <ItemGroup>
+      <RequiredPrebuiltContent Include="$(PrebuiltContentDir)/AlphaRGB.xnb;$(PrebuiltContentDir)/Arial.xnb;$(PrebuiltContentDir)/Background.xnb;$(PrebuiltContentDir)/Bubbles.xnb;$(PrebuiltContentDir)/DynamicLighting.xnb;$(PrebuiltContentDir)/FXAA.xnb;$(PrebuiltContentDir)/GammaCorrection.xnb;$(PrebuiltContentDir)/Grass.xnb;$(PrebuiltContentDir)/ItemMaterial.xnb;$(PrebuiltContentDir)/MonsterMaterial.xnb;$(PrebuiltContentDir)/NotoKR.xnb;$(PrebuiltContentDir)/Shadow.xnb;$(PrebuiltContentDir)/WaterSplashParticle.xnb" />
+      <MissingPrebuiltContent Include="@(RequiredPrebuiltContent)" Condition="!Exists('%(Identity)')" />
+    </ItemGroup>
+    <Error Condition="'@(MissingPrebuiltContent)' != ''"
+           Text="[MuMac] Missing prebuilt .xnb files: @(MissingPrebuiltContent, ', ')." />
+    <Message Text="[MuMac] Using prebuilt content from $(PrebuiltContentDir)" Importance="High" />
+  </Target>
 
   <Target Name="RestoreDotnetTools" BeforeTargets="CollectPackageReferences">
     <Message Text="Restoring dotnet tools" Importance="High" />
