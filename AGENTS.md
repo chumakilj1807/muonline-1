@@ -1,169 +1,145 @@
-# Repository Guidelines
+# AGENTS.md
 
-Comprehensive contributor guide for this MuOnline client project.
-
-## Purpose and scope
-- MuOnline client clone built on .NET 10 + MonoGame 3.8+.
-- Uses Season 6 protocol; reads Season 20 (1.20.61) client data for assets.
-- Targets OpenMU or any compatible S6 server; educational/research intent—do not commit proprietary data.
-
-## CRITICAL: Automatic Pattern Enforcement
-
-**IMPORTANT**: When working on specific task categories, you MUST automatically apply the corresponding patterns WITHOUT being asked. These are MANDATORY workflows, not optional suggestions.
-
-### Task Category → Required Pattern Mapping
-
-| When user asks to... | You MUST automatically... |
-|---------------------|---------------------------|
-| **Build/run** the project, fix build errors, setup environment | Apply muonline-build-and-run skill: Always pass `-p:MonoGameFramework=...` on Windows, verify DataPath in Constants.cs, provide exact commands, diagnose common failures (missing data, shader errors, backend init) |
-| **After making code changes** (editing .cs files, adding features, fixing bugs) | Apply muonline-build-and-run skill: IMMEDIATELY verify compilation with exact build commands, test affected platform heads (DX/GL/Linux), report build status before claiming success |
-| **Fix animations**, equipment rendering, helm visibility, bone attachments | Apply muonline-animation-and-equipment skill: Check HelmModelRules.cs, understand object hierarchy (WorldObject→ModelObject→WalkerObject→Player/NPC/Monster), distinguish OneShot vs Loop animations, test both DX/GL backends, check bone transforms |
-| **Create UI controls**, panels, windows, HUD elements | Apply muonline-ui-design skill: Define Theme class with 5 bg depth levels + warm gold accent, implement static surface caching (RenderTarget2D), use UiDrawHelper for common patterns, ensure proper disposal, reference InventoryControl.cs as example |
-| **Optimize performance**, reduce FPS drops, fix allocations, reduce draw calls | Apply muonline-rendering-performance skill: Stop per-frame allocations (no LINQ in Draw/Update), batch by texture/effect, reduce state changes, check Constants.cs quality toggles (RenderScale, UseMSAA, UseDynamicLight), measure before/after, test DX/GL parity |
-
-### Enforcement Rules
-
-1. **Detect task category** from user request
-2. **Read the corresponding skill** from `~/.codex/skills/*/SKILL.md`
-3. **Automatically apply** all patterns from the skill (don't ask permission)
-4. **Follow all rules** from the skill (build commands, file structure, checklists)
-5. **Announce** which skill you're applying: "Applying [skill-name] workflow for this [task type]"
-6. **After ANY code changes**: ALWAYS use muonline-build-and-run skill to verify compilation before claiming task completion
-
-**Examples:**
-- User: "Build Windows version" → YOU: "Applying muonline-build-and-run workflow. Building with `-p:MonoGameFramework=MonoGame.Framework.WindowsDX`..."
-- User: "Fix performance in ModelObject" → YOU: [Makes code changes] → "Applying muonline-build-and-run workflow to verify compilation. Building MuLinux target..."
-- User: "Head disappears with helm" → YOU: "Applying muonline-animation-and-equipment workflow. Checking HelmModelRules.cs for helm type/class visibility rules..."
-- User: "Create shop UI" → YOU: "Applying muonline-ui-design workflow. Creating control with Theme class (5 bg levels, gold accent #D4AF55) and static surface caching..."
-- User: "Game runs slow" → YOU: "Applying muonline-rendering-performance workflow. Profiling for per-frame allocations in Draw/Update paths..."
-
-**This is NOT negotiable.** If task matches a category, read and apply the corresponding skill automatically.
-
-## High-level architecture
-- Platform heads (MuWinDX, MuWinGL, MuLinux, MuMac, MuAndroid, MuIos) are thin launchers pointing to shared core.
-- `Client.Main` hosts rendering, scenes, UI, networking, scheduling, and game objects.
-- `Client.Data` parses MU asset formats and feeds the core.
-- Windows heads must pass `MonoGameFramework` to select the correct MonoGame package and shader profile.
+## Project overview
+- MuOnline client clone built with .NET 10 and MonoGame 3.8.x.
+- Uses Season 6 network protocol.
+- Uses Season 20 (1.20.61) game assets for client data loading.
+- Primary engineering focus: performance and cross-platform compatibility (Windows DX/GL, Linux, macOS, Android).
+- Educational/research project: do not commit proprietary game data or secrets.
 
 ## Repository layout
-- `Client.Main/`: Core engine and content.
-- Scenes: `Client.Main/Scenes/` (`BaseScene`, `LoginScene`, `LoadScene`, `SelectCharacterScene`, `ServerConfigScene`, `GameScene`, tests).
-- UI/world controls: `Client.Main/Controls/` (terrain, UI base `GameControl`, world controls).
-- Objects: `Client.Main/Objects/` (player, monsters, NPCs, items, effects, particles, worlds).
-- Worlds: `Client.Main/Objects/Worlds/<WorldName>` (Lorencia, Noria, Devias, Arena, Icarus, Atlans, Login, SelectWorld).
-- Networking: `Client.Main/Networking/` (`PacketRouter`, `PacketBuilder`, handlers, services).
-- State/logic: `Client.Main/Core/Client/` (`CharacterState`, `ScopeManager`, `PartyManager`, enums).
-- Databases/utilities: `Client.Main/Core/Utilities/` (`ItemDatabase`, `SkillDatabase`, `MapDatabase`, `NpcDatabase`, `CharacterClassDatabase`, `AppearanceConfig`, `PlayerActionMapper`, `WorldInfoAttribute`, `NpcInfoAttribute`, `PacketHandlerAttribute`).
-- Models: `Client.Main/Core/Models/` (`ScopeObject`, `ServerInfo`).
-- Graphics/effects: `Client.Main/Graphics/`, `Client.Main/Effects/`.
-- Content/shaders: `Client.Main/Content/`.
-- Data readers: `Client.Data/<FORMAT>` (BMD, ATT, MAP, OZB/OZG, CWS, OBJS, Texture, LANG, CAP, ModulusCryptor).
-- Editor: `Client.Editor/` (asset tooling).
-- Shared props: `Client.Main.Shared.props`, `Client.Data.Shared.props`; solution: `MuOnline.sln`.
+- `Client.Main/`: shared game client core (rendering, scenes, UI, networking, objects).
+- `Client.Data/`: readers/parsers for MU formats (BMD, ATT, MAP, OZB/OZG, CWS, OBJS, LANG, CAP).
+- `MuWinDX/`, `MuWinGL/`, `MuLinux/`, `MuMac/`, `MuAndroid/`, `MuIos/`: platform heads.
+- `Client.Editor/`: tooling.
+- `MuOnline.sln`: solution entry point.
 
-## Key classes and roles
-- Core entry/config: `MuGame` singleton (boot, config, DI-like accessors, main-thread marshalling via `ScheduleOnMainThread`).
-- Scenes: `BaseScene` lifecycle; `LoginScene`, `LoadScene`, `SelectCharacterScene`, `GameScene`, `ServerConfigScene`, test scenes.
-- Scheduling: `TaskScheduler` (priority queue with frame budget).
-- Networking: `PacketRouter`, `PacketBuilder`, handlers under `Networking/PacketHandling/Handlers/*`, services under `Networking/Services/*` (`LoginService`, `CharacterService`, `ConnectServerService`).
-- State: `CharacterState` (stats, inventory, skills), `ScopeManager` (objects in view), `PartyManager`.
-- Rendering/UI: `Controls/GameControl` base; `WorldControl`, `TerrainControl`, `WalkableWorldControl`, `DynamicLight`, `ModelObject`, `MapTileObject`.
-- World content: `Objects/Worlds/*` configure terrain/assets per map; vehicles/wings under `Objects/Vehicle`, `Objects/Wings`.
-- Data lookup: `ItemDatabase`, `SkillDatabase`, `MapDatabase`, `NpcDatabase`, `CharacterClassDatabase`, `AppearanceConfig`, `PlayerActionMapper`.
+## Key paths (one-line map)
+- `MuOnline.sln` — solution root for opening/building all heads from one entrypoint.
+- `Client.Main/` — shared runtime core: scenes, rendering, controls, networking, and game objects.
+- `Client.Data/` — MU file format readers and parsers consumed by the runtime loaders.
+- `Client.Main/MuGame.cs` — bootstrap, config loading, scene lifecycle, and main-thread scheduling gateway.
+- `Client.Main/Constants.cs` — global runtime flags and `DataPath`; first check for missing assets.
+- `Client.Main/appsettings.json` — host/port, protocol/client settings, graphics, and logging levels.
+- `Client.Main/MGContent/Content.mgcb` — authoritative content manifest for textures, fonts, and effects.
+- `Client.Main/MGContent/PrebuiltContent/DesktopGL/Content/` — fallback prebuilt `.xnb` set used by macOS mode.
+- `MuMac/MuMac.csproj` — macOS build rules including `UsePrebuiltContent`, `DetectWine`, and prebuilt validation.
+- `MuWinDX/MuWinDX.csproj` — Windows DX head; requires `-p:MonoGameFramework=MonoGame.Framework.WindowsDX`.
+- `MuWinGL/MuWinGL.csproj` — Windows GL head; requires `-p:MonoGameFramework=MonoGame.Framework.DesktopGL`.
+- `MuLinux/MuLinux.csproj` — Linux DesktopGL head for non-Windows desktop validation.
+- `Client.Main/Networking/` — packet routing, handlers, and service-layer protocol flow.
+- `Client.Main/Scenes/` — scene implementations (`Load/Login/Select/Game`) and transition orchestration.
+- `Client.Main/Objects/` — world entities (player/NPC/monster/items/effects) and rendering behavior.
 
-## Networking specifics
-- Season 6 protocol; handlers registered via `[PacketHandler(main, sub)]`.
-- Router switches modes between ConnectServer and GameServer; services assemble outgoing packets.
-- Threading: packet handling may occur off the main thread—marshal UI/scene mutations with `MuGame.ScheduleOnMainThread`.
-- Flow: ConnectServer list/select → login → character selection → game packets drive scope updates (`ScopeHandler`) and state updates (`CharacterDataHandler`).
+## Dev environment tips
+- Restore local tools first: `dotnet tool restore`.
+- Configure local data path in `Client.Main/Constants.cs` (`DataPath`) before running.
+- Configure server and graphics settings in `Client.Main/appsettings.json`.
+- Windows heads must always pass `-p:MonoGameFramework=...`:
+  - DX11: `MonoGame.Framework.WindowsDX`
+  - OpenGL: `MonoGame.Framework.DesktopGL`
 
-## Rendering, UI, and shaders
-- MonoGame-based; UI uses virtual resolution (see `Constants` and `appsettings.json`).
-- Controls handle coordinate scaling; world controls manage camera, selection, rendering passes.
-- Shader sources in `Client.Main/Content` use conditional compilation for DX/GL parity. The `MonoGameFramework` property selects shader profiles; always pass it on Windows builds.
-- When touching shaders, test both MuWinDX and MuWinGL; ensure effect parameter bindings align with C# code.
-- New content must be referenced so it is copied into head outputs/publish directories.
+## Build commands
+- Windows DX11:
+  - `dotnet build ./MuWinDX/MuWinDX.csproj -c Debug -p:MonoGameFramework=MonoGame.Framework.WindowsDX`
+- Windows OpenGL:
+  - `dotnet build ./MuWinGL/MuWinGL.csproj -c Debug -p:MonoGameFramework=MonoGame.Framework.DesktopGL`
+- Linux:
+  - `dotnet build ./MuLinux/MuLinux.csproj -c Debug`
+- macOS:
+  - `dotnet build ./MuMac/MuMac.csproj -c Debug`
+- macOS fallback (prebuilt content):
+  - `dotnet build ./MuMac/MuMac.csproj -c Debug -p:UsePrebuiltContent=true`
 
-## Data formats
-- Supported: BMD (models/animations), ATT (walkability), MAP (heightmap), OZB/OZG (textures), CWS (camera), OBJS (placements), LANG (localization), CAP (capsule data), Texture atlases.
-- Readers live in `Client.Data/<FORMAT>` and feed loaders in `Client.Main`.
+## Run commands
+- Windows DX11:
+  - `dotnet run --project ./MuWinDX/MuWinDX.csproj -f net10.0-windows -c Debug -p:MonoGameFramework=MonoGame.Framework.WindowsDX`
+- Windows OpenGL:
+  - `dotnet run --project ./MuWinGL/MuWinGL.csproj -f net10.0-windows -c Debug -p:MonoGameFramework=MonoGame.Framework.DesktopGL`
+- Linux:
+  - `dotnet run --project ./MuLinux/MuLinux.csproj -f net10.0 -c Debug`
+- macOS:
+  - `dotnet run --project ./MuMac/MuMac.csproj -f net10.0 -c Debug`
 
-## Configuration and environment
-- Set `Client.Main/Constants.cs` `DataPath` to your local MU data; debug defaults point to Windows path, release uses relative `Data`.
-- `Client.Main/appsettings.json`: host/port, protocol version, client version/serial, graphics (size/fullscreen/UI virtual), logging levels.
-- Keep environment-specific paths and credentials local; do not commit proprietary assets.
+## Definition of done
+- Change in `Client.Main/*.cs`:
+  - Build at least one affected desktop head.
+  - If rendering/UI/gameplay-facing: also smoke-check login/scene/render path.
+- Change in shaders/effects (`Client.Main/MGContent/*.fx`):
+  - Validate Windows DX and Windows GL builds.
+  - Confirm no effect parameter mismatches at runtime.
+- Change in packet handling/network flow:
+  - Validate build for touched head.
+  - Verify scene/UI mutations are marshaled via `MuGame.ScheduleOnMainThread`.
+- Change in macOS content/build flow:
+  - Validate both modes: default and `-p:UsePrebuiltContent=true`.
+  - Ensure prebuilt content set is complete and synchronized with `Content.mgcb`.
 
-## Build, run, and publish
-- Restore tools once: `dotnet tool restore`.
-- Build heads (Windows must pass MonoGame framework):
-  - DX11: `dotnet build ./MuWinDX/MuWinDX.csproj -c Debug -p:MonoGameFramework=MonoGame.Framework.WindowsDX`
-  - OpenGL: `dotnet build ./MuWinGL/MuWinGL.csproj -c Debug -p:MonoGameFramework=MonoGame.Framework.DesktopGL`
-  - Linux/macOS: `dotnet build ./MuLinux/MuLinux.csproj -c Debug` / `dotnet build ./MuMac/MuMac.csproj -c Debug`
-- Run examples:
-  - DX11: `dotnet run --project ./MuWinDX/MuWinDX.csproj -f net10.0-windows -c Debug -p:MonoGameFramework=MonoGame.Framework.WindowsDX`
-  - GL: `dotnet run --project ./MuWinGL/MuWinGL.csproj -f net10.0-windows -c Debug -p:MonoGameFramework=MonoGame.Framework.DesktopGL`
-  - Linux: `dotnet run --project ./MuLinux/MuLinux.csproj -f net10.0 -c Debug`
-- Publish: `dotnet publish <head>.csproj -c Release -r <rid> [-p:MonoGameFramework=...]`.
+## Change impact map
+- If you touch `Client.Main/MGContent/Content.mgcb`, also review:
+  - `Client.Main/MGContent/PrebuiltContent/DesktopGL/Content/*.xnb` completeness.
+  - `MuMac/MuMac.csproj` `ValidatePrebuiltContent` required file list.
+- If you touch `Client.Main/Constants.cs`, also review:
+  - `DataPath` expectations.
+  - quality/performance toggles used by rendering path.
+- If you touch `Client.Main/appsettings.json`, also review:
+  - config binding expectations in `MuGame.cs`.
+- If you touch platform head `.csproj`, also review:
+  - content pipeline references and copy/publish behavior.
 
-## Coding style and patterns
-- C# 10, 4-space indentation, Allman braces; `PascalCase` for types/methods, `camelCase` for locals/fields, `Async` suffix for async methods.
-- Follow scene and packet-handler patterns; return `Task` from handlers; prefer async/await.
-- Marshal UI changes to the main thread with `MuGame.ScheduleOnMainThread`.
-- Keep DX/GL references isolated per head; avoid mixing packages.
-- Use databases/configs for IDs and metadata instead of hardcoding.
+## Fast checks
+- Verify mgcb/prebuilt parity count:
+  - `awk -F: '/^\\/build:/{print $2}' Client.Main/MGContent/Content.mgcb | sed 's#\\#/#g' | sed 's#^.*/##' | sed 's/\.[^.]*$//' | sort -u | wc -l`
+  - `find Client.Main/MGContent/PrebuiltContent/DesktopGL/Content -maxdepth 1 -name '*.xnb' -printf '%f\n' | sed 's/\.xnb$//' | sort -u | wc -l`
+- Validate prebuilt mode contract on macOS project:
+  - `dotnet msbuild ./MuMac/MuMac.csproj -nologo -t:ValidatePrebuiltContent -p:UsePrebuiltContent=true`
+- Verify wine detection path on non-Windows:
+  - `dotnet msbuild ./MuMac/MuMac.csproj -nologo -t:DetectWine -p:UsePrebuiltContent=false`
 
-## Threading and scheduling
-- MonoGame render/update on main thread; networking async background.
-- Use `MuGame.ScheduleOnMainThread` for any UI/scene/state mutations affecting rendering.
-- `TaskScheduler` enforces frame budget; enqueue with priorities to avoid hitches.
+## Content and shaders
+- Content is built from `Client.Main/MGContent/Content.mgcb`.
+- `MuMac` supports prebuilt fallback content in:
+  - `Client.Main/MGContent/PrebuiltContent/DesktopGL/Content`
+- Keep prebuilt `.xnb` files synchronized with `Content.mgcb` entries.
+- Expected DesktopGL prebuilt files:
+  - `AlphaRGB.xnb`, `Arial.xnb`, `Background.xnb`, `Bubbles.xnb`, `DynamicLighting.xnb`, `FXAA.xnb`, `GammaCorrection.xnb`, `Grass.xnb`, `ItemMaterial.xnb`, `MonsterMaterial.xnb`, `NotoKR.xnb`, `Shadow.xnb`, `WaterSplashParticle.xnb`.
+- When touching shaders/effects, validate DX and GL heads.
 
-## State management
-- `CharacterState` is the source of truth for player stats, inventory, skills; events propagate updates.
-- `ScopeManager` manages in-view objects via masked IDs; use add/update/remove helpers.
-- `PartyManager` and `ServerInfo` handle party data and server metadata.
+## Code style
+- C# 10, 4-space indentation, Allman braces.
+- Naming: `PascalCase` for types/methods, `camelCase` for locals/fields, `Async` suffix for async methods.
+- Prefer async/await for networking and I/O paths.
+- Avoid hardcoded gameplay/config IDs when databases/config already exist.
 
-## Scene flow
-- `LoadScene` boot/loading → `LoginScene`/`ServerConfigScene` for credentials/server → `SelectCharacterScene` → `GameScene` (in-game orchestration).
-- Test scenes (`TestScene`, `TestAnimationScene`) available for experiments.
+## Threading and safety
+- Rendering and scene/UI updates are main-thread only.
+- Network handlers may run off main thread.
+- Marshal scene/UI mutations with `MuGame.ScheduleOnMainThread`.
 
-## Graphics and performance knobs
-- `Constants` control render scale, MSAA, dynamic lighting, terrain GPU lighting, buffer pooling, vsync, quality flags.
-- Lighting defaults (sun direction/strength) and debug flags vary by build (Debug enables debug panel, disables background music).
-- Android defaults lower quality for performance.
+## Testing instructions
+- There is no full automated test suite yet.
+- If you modify shader/rendering code, test both Windows DX and Windows GL when possible.
+- If you modify macOS content flow, validate both default mode and `UsePrebuiltContent=true` fallback.
 
-## Logging and diagnostics
-- Configure logging in `appsettings.json`; set namespaces (e.g., networking) to `Trace` when diagnosing.
-- Use task scheduler priorities to avoid frame stalls when adding expensive work.
+## PR instructions
+- Keep commits focused and concise.
+- In PR description include:
+  - intent and affected platforms,
+  - exact build/run commands executed,
+  - config expectations (`DataPath`, `appsettings.json`) when relevant.
 
-## Testing and verification
-- No automated suite yet; minimum: build and run the head you touched, then smoke login/scene switch/render/movement. Note commands in PRs.
-- Prefer deterministic fixtures over live servers when adding tests.
+## Do not commit
+- Proprietary MU client data.
+- Credentials, private endpoints, tokens, or secrets.
+- Developer-specific absolute paths unless intentionally required and documented.
+- Partial prebuilt content updates that break `Content.mgcb` parity.
 
-## Contribution guidelines
-- Commits: concise, present-tense summaries (see history like “bonfire improvements - sparks and smoke”); group related changes.
-- PRs: include intent, affected platforms, commands run, screenshots/clips for visual changes, and note DataPath/appsettings expectations; mention validated backend (DX/GL).
-- Respect existing patterns (handlers, scenes, scheduling); keep changes scoped.
+## Common pitfalls and fixes
+- Missing `-p:MonoGameFramework=...` on Windows builds causes wrong package/shader behavior.
+- Incorrect `DataPath` causes missing assets or black screens.
+- Updating UI/state directly from network thread can crash; marshal to main thread.
+- Mixing DX/GL package expectations between heads leads to restore/build conflicts.
+- On environments with restricted internet access, NuGet restore can fail (`NU1301`). Verify network/proxy before troubleshooting code changes.
 
-## Common pitfalls
-- Missing `-p:MonoGameFramework=...` on Windows → wrong MonoGame package and shaders.
-- Wrong `DataPath` → missing assets/black screens.
-- UI updates from network threads → crashes; always marshal.
-- Mixing DX/GL references across projects → restore/build conflicts.
-- Queuing heavy work without scheduler priorities → frame hitches.
-- Committing proprietary MU data or secrets is forbidden.
-
-## Quick checklist before PR
-- Set local `DataPath` and `appsettings.json`.
-- Build/run the specific head with correct `MonoGameFramework`.
-- Marshal UI/state changes via `MuGame.ScheduleOnMainThread`.
-- Add/adjust packet handlers with `[PacketHandler]` returning `Task`.
-- Update/look up IDs in databases/configs instead of hardcoding.
-- Capture commands run and visuals (if UI) for the PR description.
-
-## Workflow (AI assistants)
-For non-trivial changes:
-- Start with brainstorming.
-- Write a plan before implementation.
-- Prefer small, verifiable steps.
-
-If relevant Codex skills exist, use them.
+## Security and data handling
+- Never commit credentials, private endpoints, or local absolute paths that are environment-specific.
