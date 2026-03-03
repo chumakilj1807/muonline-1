@@ -56,7 +56,11 @@ sampler2D ShadowSampler = sampler_state
 };
 
 // Dynamic lights
+#if OPENGL
+#define MAX_LIGHTS 8
+#else
 #define MAX_LIGHTS 32
+#endif
 float3 LightPositions[MAX_LIGHTS];
 float3 LightColors[MAX_LIGHTS];
 float LightRadii[MAX_LIGHTS];
@@ -136,12 +140,18 @@ float3 CalculateTerrainLighting(float3 worldPos, float3 normal)
     float3 dynamicLight = float3(0, 0, 0);
     int lightCount = min(ActiveLightCount, MaxLightsToProcess);
 
+#if OPENGL
+    [unroll(MAX_LIGHTS)]
+#else
     [loop]
+#endif
     for (int i = 0; i < TERRAIN_MAX_LIGHTS; i++)
     {
         if (i >= lightCount) break;
 
-        float3 lightDir = LightPositions[i] - worldPos;
+        float3 lightPos = float3(LightPositions[i].x, LightPositions[i].y, LightPositions[i].z);
+        float3 lightColor = float3(LightColors[i].x, LightColors[i].y, LightColors[i].z);
+        float3 lightDir = lightPos - worldPos;
         float distSq = dot(lightDir, lightDir);
         
         // Fast inverse radius (multiplication is faster than division)
@@ -152,14 +162,14 @@ float3 CalculateTerrainLighting(float3 worldPos, float3 normal)
         float attenuation = saturate(1.0 - (distSq * invRadSq));
         
         // Hemisphere check
-        float vertical = saturate((LightPositions[i].z - worldPos.z) * invRad);
+        float vertical = saturate((lightPos.z - worldPos.z) * invRad);
         attenuation *= vertical;
 
         // ALU TRICK: dot(normal, lightDir) * invDist saves 2 multiplications vs dot(normal, lightDir * invDist)
         float invDist = rsqrt(distSq + 0.0001);
         float diffuse = saturate(dot(normal, lightDir) * invDist);
 
-        dynamicLight += LightColors[i] * (LightIntensities[i] * diffuse * attenuation);
+        dynamicLight += lightColor * (LightIntensities[i] * diffuse * attenuation);
     }
     return dynamicLight;
 }
@@ -175,19 +185,21 @@ float3 CalculateTerrainLightingLow(float3 worldPos, float3 normal)
     {
         if (i >= lightCount) break;
 
-        float3 lightDir = LightPositions[i] - worldPos;
+        float3 lightPos = float3(LightPositions[i].x, LightPositions[i].y, LightPositions[i].z);
+        float3 lightColor = float3(LightColors[i].x, LightColors[i].y, LightColors[i].z);
+        float3 lightDir = lightPos - worldPos;
         float distSq = dot(lightDir, lightDir);
         
         float invRad = 1.0 / (LightRadii[i] + 0.0001);
         float attenuation = saturate(1.0 - (distSq * (invRad * invRad)));
         
-        float vertical = saturate((LightPositions[i].z - worldPos.z) * invRad);
+        float vertical = saturate((lightPos.z - worldPos.z) * invRad);
         attenuation *= vertical;
 
         float invDist = rsqrt(distSq + 0.0001);
         float diffuse = saturate(dot(normal, lightDir) * invDist);
 
-        dynamicLight += LightColors[i] * (LightIntensities[i] * diffuse * attenuation);
+        dynamicLight += lightColor * (LightIntensities[i] * diffuse * attenuation);
     }
     return dynamicLight;
 }
@@ -197,12 +209,18 @@ float3 CalculateDynamicLighting(float3 worldPos, float3 normal)
     float3 dynamicLight = float3(0, 0, 0);
     int lightCount = min(min(ActiveLightCount, MaxLightsToProcess), MAX_LIGHTS);
 
+#if OPENGL
+    [unroll(MAX_LIGHTS)]
+#else
     [loop]
+#endif
     for (int i = 0; i < MAX_LIGHTS; i++)
     {
         if (i >= lightCount) break;
 
-        float3 lightDir = LightPositions[i] - worldPos;
+        float3 lightPos = float3(LightPositions[i].x, LightPositions[i].y, LightPositions[i].z);
+        float3 lightColor = float3(LightColors[i].x, LightColors[i].y, LightColors[i].z);
+        float3 lightDir = lightPos - worldPos;
         float distSq = dot(lightDir, lightDir);
         
         float invRad = 1.0 / (LightRadii[i] + 0.0001);
@@ -211,7 +229,7 @@ float3 CalculateDynamicLighting(float3 worldPos, float3 normal)
         float invDist = rsqrt(distSq + 0.0001);
         float diffuse = saturate(dot(normal, lightDir) * invDist);
 
-        dynamicLight += LightColors[i] * (LightIntensities[i] * diffuse * attenuation);
+        dynamicLight += lightColor * (LightIntensities[i] * diffuse * attenuation);
     }
     return dynamicLight;
 }
@@ -351,7 +369,7 @@ float SampleShadow(float3 worldPos, float3 normal)
     s.w = tex2D(ShadowSampler, uv + float2( off.x,  off.y)).r;
     
     float4 shadows = step(depth - bias, s);
-    return dot(shadows, 0.25);
+    return (shadows.x + shadows.y + shadows.z + shadows.w) * 0.25;
 }
 
 // ============================================================================

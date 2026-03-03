@@ -85,7 +85,12 @@ namespace Client.Main.Objects
         private static readonly float[] _staticInstancingLightRadii = new float[32];
         private static readonly float[] _staticInstancingLightIntensities = new float[32];
         private static readonly float[] _staticInstancingLightScores = new float[32];
+        private static Vector3[] _staticInstancingLightUploadPositions = Array.Empty<Vector3>();
+        private static Vector3[] _staticInstancingLightUploadColors = Array.Empty<Vector3>();
+        private static float[] _staticInstancingLightUploadRadii = Array.Empty<float>();
+        private static float[] _staticInstancingLightUploadIntensities = Array.Empty<float>();
         private static int _staticInstancingLastLightsVersion = -1;
+        private static int _staticInstancingLastMaxLights = -1;
         private static int _staticInstancingLastLightCount = 0;
         private static bool _staticMapInstancingFailed = false;
         private static EffectTechnique _cachedStaticMapInstancingTechnique;
@@ -471,13 +476,22 @@ namespace Client.Main.Objects
                 return;
             }
 
+            int uploadCapacity = ResolveDynamicLightParameterCapacity(effect, _staticInstancingLightPositions.Length);
+            if (uploadCapacity <= 0)
+            {
+                effect.Parameters["ActiveLightCount"]?.SetValue(0);
+                effect.Parameters["MaxLightsToProcess"]?.SetValue(0);
+                return;
+            }
+
             int maxLights = Constants.OPTIMIZE_FOR_INTEGRATED_GPU ? 8 : 16;
-            maxLights = Math.Min(maxLights, _staticInstancingLightPositions.Length);
+            maxLights = Math.Min(maxLights, Math.Min(_staticInstancingLightPositions.Length, uploadCapacity));
 
             int version = world.Terrain.ActiveLightsVersion;
-            if (version != _staticInstancingLastLightsVersion)
+            if (version != _staticInstancingLastLightsVersion || maxLights != _staticInstancingLastMaxLights)
             {
                 _staticInstancingLastLightsVersion = version;
+                _staticInstancingLastMaxLights = maxLights;
                 _staticInstancingLastLightCount = 0;
 
                 var lights = world.Terrain.ActiveLights;
@@ -491,15 +505,50 @@ namespace Client.Main.Objects
                 }
             }
 
+            _staticInstancingLastLightCount = Math.Min(_staticInstancingLastLightCount, maxLights);
             effect.Parameters["ActiveLightCount"]?.SetValue(_staticInstancingLastLightCount);
             effect.Parameters["MaxLightsToProcess"]?.SetValue(maxLights);
             if (_staticInstancingLastLightCount > 0)
+            {
+                UploadStaticMapInstancingLightArrays(effect, uploadCapacity);
+            }
+        }
+
+        private static void EnsureStaticMapInstancingLightUploadBuffers(int requiredCapacity)
+        {
+            if (_staticInstancingLightUploadPositions.Length != requiredCapacity)
+            {
+                _staticInstancingLightUploadPositions = new Vector3[requiredCapacity];
+                _staticInstancingLightUploadColors = new Vector3[requiredCapacity];
+                _staticInstancingLightUploadRadii = new float[requiredCapacity];
+                _staticInstancingLightUploadIntensities = new float[requiredCapacity];
+            }
+        }
+
+        private static void UploadStaticMapInstancingLightArrays(Effect effect, int uploadCapacity)
+        {
+            if (uploadCapacity <= 0 || effect == null)
+                return;
+
+            if (uploadCapacity == _staticInstancingLightPositions.Length)
             {
                 effect.Parameters["LightPositions"]?.SetValue(_staticInstancingLightPositions);
                 effect.Parameters["LightColors"]?.SetValue(_staticInstancingLightColors);
                 effect.Parameters["LightRadii"]?.SetValue(_staticInstancingLightRadii);
                 effect.Parameters["LightIntensities"]?.SetValue(_staticInstancingLightIntensities);
+                return;
             }
+
+            EnsureStaticMapInstancingLightUploadBuffers(uploadCapacity);
+            Array.Copy(_staticInstancingLightPositions, _staticInstancingLightUploadPositions, uploadCapacity);
+            Array.Copy(_staticInstancingLightColors, _staticInstancingLightUploadColors, uploadCapacity);
+            Array.Copy(_staticInstancingLightRadii, _staticInstancingLightUploadRadii, uploadCapacity);
+            Array.Copy(_staticInstancingLightIntensities, _staticInstancingLightUploadIntensities, uploadCapacity);
+
+            effect.Parameters["LightPositions"]?.SetValue(_staticInstancingLightUploadPositions);
+            effect.Parameters["LightColors"]?.SetValue(_staticInstancingLightUploadColors);
+            effect.Parameters["LightRadii"]?.SetValue(_staticInstancingLightUploadRadii);
+            effect.Parameters["LightIntensities"]?.SetValue(_staticInstancingLightUploadIntensities);
         }
 
         private static int SelectInstancingLightsByProximity(

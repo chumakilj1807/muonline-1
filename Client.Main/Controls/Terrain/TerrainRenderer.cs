@@ -91,13 +91,18 @@ namespace Client.Main.Controls.Terrain
         private float _terrainBuffersAmbientLight = float.NaN;
         private byte[] _terrainBuffersAlphaMapRef;
 
-        private const int DynamicLightArrayCapacity = 32; // Must match DynamicLighting.fx MAX_LIGHTS.
+        private const int DynamicLightArrayCapacity = 32;
         private readonly Vector3[] _cachedLightPositions = new Vector3[DynamicLightArrayCapacity];
         private readonly Vector3[] _cachedLightColors = new Vector3[DynamicLightArrayCapacity];
         private readonly float[] _cachedLightRadii = new float[DynamicLightArrayCapacity];
         private readonly float[] _cachedLightIntensities = new float[DynamicLightArrayCapacity];
         private readonly float[] _cachedLightScores = new float[DynamicLightArrayCapacity];
+        private Vector3[] _lightUploadPositions = Array.Empty<Vector3>();
+        private Vector3[] _lightUploadColors = Array.Empty<Vector3>();
+        private float[] _lightUploadRadii = Array.Empty<float>();
+        private float[] _lightUploadIntensities = Array.Empty<float>();
         private int _lastLightsVersion = -1;
+        private int _lastLightSelectionMaxLights = -1;
         private int _lastLightCount = 0;
         private const float MinLightInfluence = 0.001f;
 
@@ -660,15 +665,24 @@ namespace Client.Main.Controls.Terrain
                 return;
             }
 
+            int uploadCapacity = ResolveDynamicLightParameterCapacity(effect);
+            if (uploadCapacity <= 0)
+            {
+                effect.Parameters["ActiveLightCount"]?.SetValue(0);
+                effect.Parameters["MaxLightsToProcess"]?.SetValue(0);
+                return;
+            }
+
             int maxLights = Constants.OPTIMIZE_FOR_INTEGRATED_GPU ? 8 : DynamicLightArrayCapacity;
-            maxLights = Math.Min(maxLights, _cachedLightPositions.Length);
+            maxLights = Math.Min(maxLights, Math.Min(_cachedLightPositions.Length, uploadCapacity));
             int version = _lightManager.ActiveLightsVersion;
 
             // Only rebuild when the light snapshot changes (throttled at
             // DYNAMIC_LIGHT_UPDATE_FPS).  Between updates, reuse the cached arrays.
-            if (version != _lastLightsVersion)
+            if (version != _lastLightsVersion || maxLights != _lastLightSelectionMaxLights)
             {
                 _lastLightsVersion = version;
+                _lastLightSelectionMaxLights = maxLights;
                 _lastLightCount = 0;
 
                 var activeLights = _lightManager.ActiveLights;
@@ -710,15 +724,71 @@ namespace Client.Main.Controls.Terrain
                 }
             }
 
+            _lastLightCount = Math.Min(_lastLightCount, maxLights);
             effect.Parameters["ActiveLightCount"]?.SetValue(_lastLightCount);
             effect.Parameters["MaxLightsToProcess"]?.SetValue(maxLights);
             if (_lastLightCount > 0)
+            {
+                UploadDynamicLightArrays(effect, uploadCapacity);
+            }
+        }
+
+        private int ResolveDynamicLightParameterCapacity(Effect effect)
+        {
+            int fallback = _cachedLightPositions.Length;
+            int positions = GetEffectParameterArrayCapacity(effect?.Parameters["LightPositions"], fallback);
+            int colors = GetEffectParameterArrayCapacity(effect?.Parameters["LightColors"], fallback);
+            int radii = GetEffectParameterArrayCapacity(effect?.Parameters["LightRadii"], fallback);
+            int intensities = GetEffectParameterArrayCapacity(effect?.Parameters["LightIntensities"], fallback);
+
+            int capacity = Math.Min(Math.Min(positions, colors), Math.Min(radii, intensities));
+            capacity = Math.Min(capacity, fallback);
+            return Math.Max(capacity, 1);
+        }
+
+        private static int GetEffectParameterArrayCapacity(EffectParameter parameter, int fallback)
+        {
+            if (parameter?.Elements == null || parameter.Elements.Count <= 0)
+                return fallback;
+
+            return parameter.Elements.Count;
+        }
+
+        private void EnsureDynamicLightUploadBuffers(int requiredCapacity)
+        {
+            if (_lightUploadPositions.Length != requiredCapacity)
+            {
+                _lightUploadPositions = new Vector3[requiredCapacity];
+                _lightUploadColors = new Vector3[requiredCapacity];
+                _lightUploadRadii = new float[requiredCapacity];
+                _lightUploadIntensities = new float[requiredCapacity];
+            }
+        }
+
+        private void UploadDynamicLightArrays(Effect effect, int uploadCapacity)
+        {
+            if (uploadCapacity <= 0 || effect == null)
+                return;
+
+            if (uploadCapacity == _cachedLightPositions.Length)
             {
                 effect.Parameters["LightPositions"]?.SetValue(_cachedLightPositions);
                 effect.Parameters["LightColors"]?.SetValue(_cachedLightColors);
                 effect.Parameters["LightRadii"]?.SetValue(_cachedLightRadii);
                 effect.Parameters["LightIntensities"]?.SetValue(_cachedLightIntensities);
+                return;
             }
+
+            EnsureDynamicLightUploadBuffers(uploadCapacity);
+            Array.Copy(_cachedLightPositions, _lightUploadPositions, uploadCapacity);
+            Array.Copy(_cachedLightColors, _lightUploadColors, uploadCapacity);
+            Array.Copy(_cachedLightRadii, _lightUploadRadii, uploadCapacity);
+            Array.Copy(_cachedLightIntensities, _lightUploadIntensities, uploadCapacity);
+
+            effect.Parameters["LightPositions"]?.SetValue(_lightUploadPositions);
+            effect.Parameters["LightColors"]?.SetValue(_lightUploadColors);
+            effect.Parameters["LightRadii"]?.SetValue(_lightUploadRadii);
+            effect.Parameters["LightIntensities"]?.SetValue(_lightUploadIntensities);
         }
 
         /// <summary>

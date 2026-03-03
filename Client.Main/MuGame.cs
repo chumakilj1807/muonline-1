@@ -280,13 +280,36 @@ namespace Client.Main
             }
         }
 
+        private static (string Directory, string FileName) ResolveSettingsFileLocation()
+        {
+            string configuredPath = string.IsNullOrWhiteSpace(Constants.SETTINGS_PATH)
+                ? "appsettings.json"
+                : Constants.SETTINGS_PATH;
+
+            if (Path.IsPathRooted(configuredPath))
+            {
+                string fullPath = Path.GetFullPath(configuredPath);
+                return (Path.GetDirectoryName(fullPath) ?? AppContext.BaseDirectory, Path.GetFileName(fullPath));
+            }
+
+            // Prefer output folder so "dotnet run --project ..." works from any cwd.
+            string outputCandidate = Path.Combine(AppContext.BaseDirectory, configuredPath);
+            if (File.Exists(outputCandidate))
+            {
+                return (Path.GetDirectoryName(outputCandidate) ?? AppContext.BaseDirectory, Path.GetFileName(outputCandidate));
+            }
+
+            string currentDirectoryCandidate = Path.GetFullPath(configuredPath);
+            return (Path.GetDirectoryName(currentDirectoryCandidate) ?? AppContext.BaseDirectory, Path.GetFileName(currentDirectoryCandidate));
+        }
+
         protected override void Initialize()
         {
-            var fullPath = Path.GetFullPath(Constants.SETTINGS_PATH);
-            ConfigDirectory = Path.GetDirectoryName(fullPath)!;
+            (string configDirectory, string configFileName) = ResolveSettingsFileLocation();
+            ConfigDirectory = configDirectory;
             AppConfiguration = new ConfigurationBuilder()
                 .SetBasePath(ConfigDirectory)
-                .AddJsonFile(Constants.SETTINGS_PATH, optional: false, reloadOnChange: true)
+                .AddJsonFile(configFileName, optional: false, reloadOnChange: true)
                 .AddJsonFile(LocalSettingsFileName, optional: true, reloadOnChange: true)
                 .Build();
 
