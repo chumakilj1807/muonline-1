@@ -260,8 +260,8 @@ namespace Client.Main.Scenes
 
         private async Task DownloadAndExtractAssetsAsync(string localZip, string extractPath, CancellationToken ct)
         {
-            string[] urls = { 
-            //    _dataPathUrl, 
+            string[] urls = {
+                _dataPathUrl,
                 Constants.DefaultDataPathUrl
             };
             Exception lastError = null;
