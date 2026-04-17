@@ -182,7 +182,7 @@ namespace Client.Main
 
         // Supported fonts: Arial & NotoKR 
         public static string FONT_NAME = "Arial";
-        public static Encoding DATA_TEXT_ENCODING = Encoding.UTF8;
+        public static Encoding DATA_TEXT_ENCODING = Encoding.Latin1;
 
         static Constants()
         {
