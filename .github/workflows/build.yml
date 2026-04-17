@@ -8,8 +8,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 jobs:
   build-windows:
@@ -190,85 +188,3 @@ jobs:
           name: muonline-ios
           path: muonline-ios.zip
 
-  pages:
-    needs: [build-windows, build-android, build-linux, build-macos, build-ios]
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    concurrency:
-      group: pages
-      cancel-in-progress: false
-
-    steps:
-      - name: Download OpenGL Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: muonline-windows-opengl
-          path: artifacts
-
-      - name: Download DirectX Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: muonline-windows-directx
-          path: artifacts
-
-      - name: Download Android Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: muonline-android
-          path: artifacts
-
-      - name: Download Linux Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: muonline-linux
-          path: artifacts
-
-      - name: Download macOS Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: muonline-macos
-          path: artifacts
-
-      - name: Download iOS Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: muonline-ios
-          path: artifacts
-
-      - name: Prepare site
-        run: |
-          mkdir -p site
-          cp artifacts/* site/
-          cd site
-          echo '<html><body><h1>MuOnline Builds</h1>' > index.html
-          echo '<h2>Windows Builds</h2>' >> index.html
-          echo '<ul>' >> index.html
-          echo '<li><a href="muonline-windows-opengl.zip">Windows (OpenGL) - Compatible with older hardware</a></li>' >> index.html
-          echo '<li><a href="muonline-windows-directx.zip">Windows (DirectX 11) - Better performance on modern GPUs</a></li>' >> index.html
-          echo '</ul>' >> index.html
-          echo '<h2>Linux Build</h2>' >> index.html
-          echo '<ul>' >> index.html
-          echo '<li><a href="muonline-linux.zip">Linux (DesktopGL) - Packaged on Windows for MGCB compatibility</a></li>' >> index.html
-          echo '</ul>' >> index.html
-          echo '<h2>macOS Build</h2>' >> index.html
-          echo '<ul>' >> index.html
-          echo '<li><a href="muonline-macos.zip">macOS (DesktopGL) - Packaged on Windows for MGCB compatibility</a></li>' >> index.html
-          echo '</ul>' >> index.html
-          echo '<h2>iOS Build</h2>' >> index.html
-          echo '<ul>' >> index.html
-          echo '<li><a href="muonline-ios.zip">iOS (Simulator, unsigned) - Requires macOS to run</a></li>' >> index.html
-          echo '</ul>' >> index.html
-          echo '<h2>Mobile Builds</h2>' >> index.html
-          echo '<ul>' >> index.html
-          echo '<li><a href="muonline-android.zip">Android APK</a></li>' >> index.html
-          echo '</ul>' >> index.html
-          echo '</body></html>' >> index.html
-
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
-
-      - id: deployment
-        uses: actions/deploy-pages@v4
