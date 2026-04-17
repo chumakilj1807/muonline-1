@@ -17,6 +17,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -316,6 +317,7 @@ namespace Client.Main.Scenes
             });
 
             await ExtractZipWithProgressAsync(localZip, extractPath, ct);
+            ApplyEmbeddedPlayerBmd(extractPath);
 
             UpdateProgress(p => p.StatusText = "Cleaning up...");
             SafeDeleteFile(localZip);
@@ -763,6 +765,30 @@ namespace Client.Main.Scenes
                     p.StatusText = "Extraction complete!";
                 });
             }, ct);
+        }
+
+        private static void ApplyEmbeddedPlayerBmd(string extractPath)
+        {
+            try
+            {
+                var asm = Assembly.GetExecutingAssembly();
+                var resName = asm.GetManifestResourceNames()
+                    .FirstOrDefault(n => n.EndsWith("player.bmd", StringComparison.OrdinalIgnoreCase));
+                if (resName == null) return;
+
+                var destDir = Path.Combine(extractPath, "Player");
+                Directory.CreateDirectory(destDir);
+                var dest = Path.Combine(destDir, "Player.bmd");
+
+                using var src = asm.GetManifestResourceStream(resName);
+                using var fs = File.Create(dest);
+                src.CopyTo(fs);
+                Debug.WriteLine($"[LoadScene] Applied embedded Player.bmd to {dest}");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[LoadScene] Failed to apply embedded Player.bmd: {ex.Message}");
+            }
         }
 
         private static string NormalizeEntryPath(string entryFullName)
