@@ -552,6 +552,44 @@ namespace Client.Main.Controls.UI.Game.Inventory
             }
 
             _pickedItemRenderer.Update(gameTime);
+
+            // Ctrl+Q/W/E/R — assign hovered consumable to quick-use slot (after _hoveredItem is set)
+            TryAssignHoveredItemToQuickBar();
+        }
+
+        private static readonly Keys[] QuickBarAssignKeys = { Keys.Q, Keys.W, Keys.E, Keys.R };
+
+        private void TryAssignHoveredItemToQuickBar()
+        {
+            var bar = Client.Main.Controls.UI.Game.Hud.ItemQuickBar.Instance;
+            if (bar == null || !Visible) return;
+
+            bool ctrlDown = MuGame.Instance.Keyboard.IsKeyDown(Keys.LeftControl)
+                         || MuGame.Instance.Keyboard.IsKeyDown(Keys.RightControl);
+            if (!ctrlDown) return;
+
+            // Find which slot key was just pressed
+            for (int i = 0; i < QuickBarAssignKeys.Length; i++)
+            {
+                var key = QuickBarAssignKeys[i];
+                bool justPressed = MuGame.Instance.Keyboard.IsKeyDown(key)
+                                && MuGame.Instance.PrevKeyboard.IsKeyUp(key);
+                if (!justPressed) continue;
+
+                // Use hovered item if available, else item under cursor
+                var item = _hoveredItem;
+                if (item == null) return;
+
+                if (item.Definition?.IsConsumable() != true || item.Definition.IsUpgradeJewel())
+                {
+                    MessageWindow.Show("Only consumable items (potions, scrolls) can be assigned to quick slots.");
+                    return;
+                }
+
+                int invSlot = InventorySlotOffsetConstant + (item.GridPosition.Y * Columns) + item.GridPosition.X;
+                bar.AssignItem(i, item, invSlot);
+                return;
+            }
         }
 
         private void ToggleRepairMode()

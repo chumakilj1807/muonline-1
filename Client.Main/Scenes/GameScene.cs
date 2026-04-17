@@ -66,6 +66,7 @@ namespace Client.Main.Scenes
         private GameSceneDuelController _duelController;
         private GameSceneChatController _chatController;
         private WorldObject _autoAttackTarget; // persistent attack target for auto-attack
+        private Controls.UI.Game.Hud.ItemQuickBar _itemQuickBar; // Q/W/E/R consumable bar
         private GameSceneUiPreloadController _uiPreloadController;
         private GameSceneWindowCloseController _windowCloseController;
 
@@ -190,6 +191,13 @@ namespace Client.Main.Scenes
             Controls.Add(_skillQuickSlot);
             _skillQuickSlot.BringToFront();
             _skillController = new GameSceneSkillController(this, _skillQuickSlot, _logger, _duelController.IsDuelAttackTarget);
+
+            // Item quick bar (Q/W/E/R consumables)
+            _itemQuickBar = new Controls.UI.Game.Hud.ItemQuickBar(MuGame.Network);
+            _itemQuickBar.Align = ControlAlign.HorizontalCenter | ControlAlign.Bottom;
+            _itemQuickBar.Margin = new Margin { Bottom = 60 };
+            Controls.Add(_itemQuickBar);
+            _itemQuickBar.BringToFront();
 
             // Experience bar
             var experienceBar = new ExperienceBarControl(MuGame.Network.GetCharacterState());
@@ -588,6 +596,11 @@ namespace Client.Main.Scenes
             // Handle skill usage with right-click
             _skillController?.HandleRightClickSkillUsage();
             _hotkeys?.HandleInWorld(currentKeyboardState, previousKeyboardState);
+
+            // Q/W/E/R quick-use consumables (only when not typing in chat)
+            bool isTyping = FocusControl is Controls.UI.TextFieldControl;
+            if (!isTyping)
+                _itemQuickBar?.HandleKeys(currentKeyboardState, previousKeyboardState);
 
             // Update ping every 5 seconds to reduce network overhead
             _pingTimer += gameTime.ElapsedGameTime.TotalSeconds;
