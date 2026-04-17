@@ -123,9 +123,9 @@ namespace Client.Main.Controls.UI.Game.Skills
             // Update border/background based on selection
             if (_isSelected)
             {
-                BackgroundColor = new Color(255, 215, 0) * 0.5f; // Gold highlight (more visible)
+                BackgroundColor = Color.Transparent;
                 BorderColor = Color.Gold;
-                BorderThickness = 3;
+                BorderThickness = 2;
             }
             else
             {

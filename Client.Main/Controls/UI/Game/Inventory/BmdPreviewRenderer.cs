@@ -939,7 +939,13 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 return (270f, 0f, 0f);
             }
 
-            // Weapons (swords, axes, maces, spears, bows)
+            // Bows and crossbows (Elf weapons, group 4)
+            if (group == 4)
+            {
+                return (25f, -45f, 0f);
+            }
+
+            // Weapons (swords, axes, maces, spears, staves)
             if (group == 0 || group == 1 || group == 2 || group == 3 || group == 5)
             {
                 return (25f, 45f, 0f);

@@ -53,12 +53,14 @@ namespace Client.Main.Controls.UI.Game.Hud
             ushort currentLevel = _characterState.Level;
             ulong prevLevelExp = currentLevel > 1 ? (ulong)((currentLevel - 1 + 9) * (currentLevel - 1) * (currentLevel - 1) * 10) : 0;
 
-            // Calculate experience range for current level
-            ulong expInCurrentLevel = _characterState.Experience - prevLevelExp;
-            ulong expNeededForLevel = _characterState.ExperienceForNextLevel - prevLevelExp;
+            // Calculate experience range for current level (clamp to avoid ulong underflow after death)
+            ulong exp = _characterState.Experience;
+            ulong expInCurrentLevel = exp > prevLevelExp ? exp - prevLevelExp : 0;
+            ulong nextExp = _characterState.ExperienceForNextLevel;
+            ulong expNeededForLevel = nextExp > prevLevelExp ? nextExp - prevLevelExp : 0;
 
             // Calculate percentage (0-100%)
-            double expPercent = expNeededForLevel > 0 ? (expInCurrentLevel / (double)expNeededForLevel) * 100.0 : 0.0;
+            double expPercent = expNeededForLevel > 0 ? Math.Min((expInCurrentLevel / (double)expNeededForLevel) * 100.0, 100.0) : 0.0;
 
             _expLabel.Text = $"EXP: {expPercent:F1}%";
         }

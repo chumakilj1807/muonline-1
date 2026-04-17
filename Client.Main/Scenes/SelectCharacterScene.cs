@@ -4,6 +4,7 @@ using Client.Main.Controls.UI.Game;
 using Client.Main.Controls.UI.SelectCharacter;
 using Client.Main.Controllers;
 using Client.Main.Core.Client;
+using Client.Main.Core.Utilities;
 using Client.Main.Graphics;
 using Client.Main.Helpers;
 using Client.Main.Models;
@@ -1269,7 +1270,7 @@ namespace Client.Main.Scenes
             textY += 22;
 
             // Class and Level
-            string classLevelText = $"{character.Class}  •  Lv.{character.Level}";
+            string classLevelText = $"{CharacterClassDatabase.GetClassName(character.Class)}  •  Lv.{character.Level}";
             Color infoColor = isSelected ? Theme.AccentBright : Theme.TextGray;
             sb.DrawString(font, classLevelText, new Vector2(textX, textY) + new Vector2(1, 1), Color.Black * 0.7f, 0f, Vector2.Zero, infoScale, SpriteEffects.None, 0f);
             sb.DrawString(font, classLevelText, new Vector2(textX, textY), infoColor, 0f, Vector2.Zero, infoScale, SpriteEffects.None, 0f);

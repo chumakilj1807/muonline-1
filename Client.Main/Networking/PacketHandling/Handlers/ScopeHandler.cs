@@ -1342,6 +1342,13 @@ namespace Client.Main.Networking.PacketHandling.Handlers
 
                 _scopeManager.AddOrUpdateMoneyInScope(masked, raw, x, y, amount);
                 _logger.LogInformation("💰 MoneyDroppedExtended: ID={Id:X4}, Amount={Amount}, Pos=({X},{Y})", masked, amount, x, y);
+
+                var moneyDrop = new MoneyScopeObject(masked, raw, x, y, amount);
+                _ = Task.Run(async () =>
+                {
+                    try { await ProcessDroppedItemAsync(moneyDrop, masked, "Sound/pDropMoney.wav"); }
+                    catch (Exception ex2) { _logger.LogError(ex2, "Error creating MoneyDroppedExtended world object."); }
+                });
             }
             catch (Exception ex)
             {
