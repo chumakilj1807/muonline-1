@@ -2,7 +2,6 @@ using Android;
 using Android.App;
 using Android.Content;
 using Android.Content.PM;
-using Android.Net;
 using Android.OS;
 using Android.Provider;
 using Android.Util;
@@ -179,33 +178,6 @@ namespace MuAndroid
                 return $"/storage/emulated/0/Download/{name}";
             }
         }
-        private static void SetupExternalDataPath()
-        {
-            var sdcard = Android.OS.Environment.ExternalStorageDirectory?.AbsolutePath ?? "/sdcard";
-            Constants.DataPath = Path.Combine(sdcard, "MuData", "Data");
-        }
-
-        private void RequestManageStoragePermission()
-        {
-            if (Build.VERSION.SdkInt >= BuildVersionCodes.R)
-            {
-                if (!Android.OS.Environment.IsExternalStorageManager)
-                {
-                    try
-                    {
-                        var intent = new Intent(Settings.ActionManageAppAllFilesAccessPermission);
-                        intent.SetData(Uri.Parse("package:" + PackageName));
-                        StartActivity(intent);
-                    }
-                    catch
-                    {
-                        var intent = new Intent(Settings.ActionManageAllFilesAccessPermission);
-                        StartActivity(intent);
-                    }
-                }
-            }
-        }
-
         private void ApplyAndroidDefaults()
         {
             Constants.DRAW_GRASS = false;
@@ -229,8 +201,6 @@ namespace MuAndroid
             Constants.SETTINGS_PATH = EnsureAndroidConfig();
             TextFieldControl.ControlType = typeof(AndroidTextFieldControl);
 
-            SetupExternalDataPath();
-            RequestManageStoragePermission();
             ApplyAndroidDefaults();
             Instance = this;
             AndroidKeyboard.Activity = this;
