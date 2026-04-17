@@ -1037,7 +1037,6 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                           && world.TryGetWalkerById(maskedId, out var walker) && walker is MonsterObject monster)
                         {
                             monster.OnReceiveDamage();
-                            monster.PlayAction((byte)MonsterActionType.Shock);
                             _logger.LogDebug("Triggering hit animation for {Type} {Id:X4}", walker.GetType().Name, maskedId);
                         }
                     });

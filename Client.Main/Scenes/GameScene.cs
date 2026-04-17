@@ -65,6 +65,7 @@ namespace Client.Main.Scenes
         private GameSceneObjectEditorController _objectEditorController;
         private GameSceneDuelController _duelController;
         private GameSceneChatController _chatController;
+        private WorldObject _autoAttackTarget; // persistent attack target for auto-attack
         private GameSceneUiPreloadController _uiPreloadController;
         private GameSceneWindowCloseController _windowCloseController;
 
@@ -537,39 +538,51 @@ namespace Client.Main.Scenes
             _playerMenuController?.Update(gameTime, currentKeyboardState, uiMouse, prevUiMouse);
             _skillController?.Update();
 
-            // Handle attack clicks on monsters with proper validation
+            // Set auto-attack target on left-click
             if (!IsMouseInputConsumedThisFrame &&
-                MouseHoverObject is MonsterObject targetMonster &&
                 MuGame.Instance.Mouse.LeftButton == ButtonState.Pressed &&
-                MuGame.Instance.PrevMouseState.LeftButton == ButtonState.Released) // Fresh press
+                MuGame.Instance.PrevMouseState.LeftButton == ButtonState.Released)
             {
-                if (Hero != null &&
-                    !Hero.IsDead && // Don't attack if player is dead
-                    !targetMonster.IsDead &&
-                    targetMonster.World == World && // Ensure same world
-                    Vector2.Distance(Hero.Location, targetMonster.Location) <= Hero.GetAttackRangeTiles()) // Check range
+                if (MouseHoverObject is MonsterObject clickedMonster &&
+                    !clickedMonster.IsDead && clickedMonster.World == World)
                 {
-                    Hero.Attack(targetMonster);
-                    SetMouseInputConsumed(); // Consume the click
+                    _autoAttackTarget = clickedMonster;
+                    SetMouseInputConsumed();
+                }
+                else if (MouseHoverObject is PlayerObject clickedPlayer &&
+                    clickedPlayer != _hero &&
+                    (_duelController?.IsDuelAttackTarget(clickedPlayer) == true) &&
+                    !clickedPlayer.IsDead && clickedPlayer.World == World)
+                {
+                    _autoAttackTarget = clickedPlayer;
+                    SetMouseInputConsumed();
+                }
+                else if (MouseHoverObject == null || MouseHoverObject is not MonsterObject)
+                {
+                    // Clicked empty space — clear target
+                    _autoAttackTarget = null;
                 }
             }
 
-            // Handle attack clicks on duel opponent players (treat as monster during duel)
-            if (!IsMouseInputConsumedThisFrame &&
-                MouseHoverObject is PlayerObject targetPlayer &&
-                targetPlayer != _hero &&
-                (_duelController?.IsDuelAttackTarget(targetPlayer) == true) &&
-                MuGame.Instance.Mouse.LeftButton == ButtonState.Pressed &&
-                MuGame.Instance.PrevMouseState.LeftButton == ButtonState.Released) // Fresh press
+            // Clear target if it died or left the world
+            if (_autoAttackTarget != null)
             {
-                if (Hero != null &&
-                    !Hero.IsDead &&
-                    !targetPlayer.IsDead &&
-                    targetPlayer.World == World)
+                bool targetGone = _autoAttackTarget switch
                 {
-                    Hero.Attack(targetPlayer);
-                    SetMouseInputConsumed();
-                }
+                    MonsterObject m => m.IsDead || m.World != World,
+                    PlayerObject p => p.IsDead || p.World != World,
+                    _ => true
+                };
+                if (targetGone) _autoAttackTarget = null;
+            }
+
+            // Continuous auto-attack each frame while target is alive
+            if (_autoAttackTarget != null && Hero != null && !Hero.IsDead)
+            {
+                if (_autoAttackTarget is MonsterObject autoMonster)
+                    Hero.Attack(autoMonster);
+                else if (_autoAttackTarget is PlayerObject autoPlayer)
+                    Hero.Attack(autoPlayer);
             }
 
             // Handle skill usage with right-click
