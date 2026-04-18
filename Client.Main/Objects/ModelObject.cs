@@ -324,26 +324,26 @@ namespace Client.Main.Objects
 
         public override async Task LoadContent()
         {
+            StepLogger.Log($"ModelObject.LoadContent: start {GetType().Name}");
             await base.LoadContent();
+            StepLogger.Log($"ModelObject.LoadContent: base done {GetType().Name}");
 
             ReleaseDynamicBuffers();
 
             if (Model == null)
             {
-                // This is a valid state, e.g., when an item is unequipped.
-                // Clear out graphics resources to ensure it becomes invisible.
                 _boneVertexBuffers = null;
                 _boneIndexBuffers = null;
                 _boneTextures = null;
                 _scriptTextures = null;
                 _dataTextures = null;
                 _logger?.LogDebug("Model is null for {ObjectName}. Clearing buffers. This is likely an unequip action.", ObjectName);
-                // Set to Ready because it's a valid, though non-renderable, state.
                 Status = GameControlStatus.Ready;
                 return;
             }
 
             int meshCount = Model.Meshes.Length;
+            StepLogger.Log($"ModelObject.LoadContent: alloc buffers meshCount={meshCount} {GetType().Name}");
             _boneVertexBuffers = new DynamicVertexBuffer[meshCount];
             _boneIndexBuffers = new DynamicIndexBuffer[meshCount];
             _boneTextures = new Texture2D[meshCount];
@@ -357,7 +357,7 @@ namespace Client.Main.Objects
             _meshBlendByScript = new bool[meshCount];
             _meshTexturePath = new string[meshCount];
 
-            // PERFORMANCE: Preload all textures during LoadContent to avoid SetData during gameplay
+            StepLogger.Log($"ModelObject.LoadContent: preloading textures {GetType().Name}");
             var texturePreloadTasks = new List<Task>();
 
             for (int meshIndex = 0; meshIndex < meshCount; meshIndex++)
@@ -367,7 +367,6 @@ namespace Client.Main.Objects
 
                 _meshTexturePath[meshIndex] = texturePath;
 
-                // Preload texture data asynchronously to avoid lazy loading during render
                 if (!string.IsNullOrEmpty(texturePath))
                 {
                     texturePreloadTasks.Add(TextureLoader.Instance.Prepare(texturePath));
@@ -382,10 +381,11 @@ namespace Client.Main.Objects
                 _meshBlendByScript[meshIndex] = _scriptTextures[meshIndex]?.Bright ?? false;
             }
 
-            // Wait for all textures to be preloaded
             if (texturePreloadTasks.Count > 0)
             {
+                StepLogger.Log($"ModelObject.LoadContent: awaiting {texturePreloadTasks.Count} texture tasks {GetType().Name}");
                 await Task.WhenAll(texturePreloadTasks);
+                StepLogger.Log($"ModelObject.LoadContent: textures done {GetType().Name}");
             }
 
             _sortTextureHintDirty = true;
@@ -393,16 +393,17 @@ namespace Client.Main.Objects
 
             _blendMeshIndicesScratch = new int[meshCount];
 
-            // Initialize mesh buffer cache
             _meshBufferCache = new MeshBufferCache[meshCount];
             for (int i = 0; i < meshCount; i++)
             {
                 _meshBufferCache[i] = new MeshBufferCache { IsValid = false };
             }
 
+            StepLogger.Log($"ModelObject.LoadContent: InvalidateBuffers {GetType().Name}");
             InvalidateBuffers(BUFFER_FLAG_ALL);
             _dynamicBuffersFrozen = false;
             _contentLoaded = true;
+            StepLogger.Log($"ModelObject.LoadContent: content loaded {GetType().Name}");
 
             if (Model?.Bones != null && Model.Bones.Length > 0)
             {

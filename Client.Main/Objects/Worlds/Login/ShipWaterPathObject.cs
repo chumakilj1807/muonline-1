@@ -1,4 +1,5 @@
 ﻿using Client.Main.Content;
+using Client.Main.Core.Utilities;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using System;
@@ -15,17 +16,18 @@ namespace Client.Main.Objects.Worlds.Login
 
         public override async Task Load()
         {
-            // Configure properties for ship water effect
+            var idx = (Type + 1).ToString().PadLeft(2, '0');
+            StepLogger.Log($"ShipWaterPathObject.Load: BMD Object{idx}");
             BlendState = BlendState.NonPremultiplied;
             LightEnabled = true;
             IsTransparent = true;
             BlendMeshState = BlendState.Additive;
             Alpha = 1f;
 
-            // Load the model for ship water path
-            var idx = (Type + 1).ToString().PadLeft(2, '0');
             Model = await BMDLoader.Instance.Prepare($"Object95/Object{idx}.bmd");
+            StepLogger.Log($"ShipWaterPathObject.Load: base.Load Object{idx}");
             await base.Load();
+            StepLogger.Log($"ShipWaterPathObject.Load: done Object{idx}");
 
             Position = new Vector3(Position.X,Position.Y,Position.Z + 15f);
 

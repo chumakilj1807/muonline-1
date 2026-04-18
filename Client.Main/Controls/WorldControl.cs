@@ -241,7 +241,18 @@ namespace Client.Main.Controls
                 foreach (var mapObj in obj.Objects)
                 {
                     var instance = WorldObjectFactory.CreateMapTileObject(this, mapObj);
-                    if (instance != null) tasks.Add(instance.Load());
+                    if (instance != null)
+                    {
+                        var capturedType = instance.GetType().Name;
+                        var capturedMapObj = mapObj;
+                        tasks.Add(instance.Load().ContinueWith(t =>
+                        {
+                            if (t.IsFaulted)
+                                StepLogger.Log($"WorldControl.Load: FAULT in {capturedType}: {t.Exception?.GetBaseException()?.Message}");
+                            else
+                                StepLogger.Log($"WorldControl.Load: loaded {capturedType} ok");
+                        }, System.Threading.Tasks.TaskContinuationOptions.ExecuteSynchronously));
+                    }
                 }
                 StepLogger.Log($"WorldControl.Load: OBJ tasks queued={tasks.Count}");
             }

@@ -1,3 +1,4 @@
+using Client.Main.Core.Utilities;
 using Client.Main.Objects.Effects; // Contains the particle system.
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -12,6 +13,7 @@ namespace Client.Main.Objects.Worlds.Login
 
         public override async Task Load()
         {
+            StepLogger.Log("WaterSplashObject.Load: creating particle system");
             _particleSystem = new WaterMistParticleSystem()
             {
                 EmissionRate = 10f,
@@ -24,13 +26,16 @@ namespace Client.Main.Objects.Worlds.Login
                 ScaleGrowth = 0.5f,
                 Wind = new Vector2(300f, -350f),
                 UpwardAcceleration = -250f,
-                ParticleColor = new Color((byte)150, (byte)170, (byte)200, (byte)60)  // Zmniejszona jasność i alpha
+                ParticleColor = new Color((byte)150, (byte)170, (byte)200, (byte)60)
             };
             _particleSystem.Position = Position;
-            _particleSystem.World = World;  // Set World BEFORE Load()
+            _particleSystem.World = World;
             World.Objects.Add(_particleSystem);
+            StepLogger.Log("WaterSplashObject.Load: particle.Load()");
             await _particleSystem.Load();
+            StepLogger.Log("WaterSplashObject.Load: base.Load()");
             await base.Load();
+            StepLogger.Log("WaterSplashObject.Load: done");
         }
     }
 }
