@@ -206,7 +206,9 @@ namespace Client.Main.Controls
 
         public override async Task Load()
         {
+            StepLogger.Log($"WorldControl.Load: start WorldIndex={WorldIndex}");
             await base.Load();
+            StepLogger.Log("WorldControl.Load: base.Load done");
 
             CreateMapTileObjects();
             Camera.Instance.AspectRatio = GraphicsDevice.Viewport.AspectRatio;
@@ -217,6 +219,7 @@ namespace Client.Main.Controls
 
             // Load camera settings
             var capPath = Path.Combine(dataPath, worldFolder, "Camera_Angle_Position.bmd");
+            StepLogger.Log($"WorldControl.Load: CAP exists={File.Exists(capPath)}");
             if (File.Exists(capPath))
             {
                 var capReader = new CAPReader();
@@ -224,23 +227,28 @@ namespace Client.Main.Controls
                 Camera.Instance.FOV = data.CameraFOV * Constants.FOV_SCALE;
                 Camera.Instance.Position = data.CameraPosition;
                 Camera.Instance.Target = data.HeroPosition;
+                StepLogger.Log("WorldControl.Load: CAP loaded");
             }
 
             // Load terrain OBJ
             var objPath = Path.Combine(dataPath, worldFolder, $"EncTerrain{WorldIndex}.obj");
+            StepLogger.Log($"WorldControl.Load: OBJ exists={File.Exists(objPath)}");
             if (File.Exists(objPath))
             {
                 var reader = new OBJReader();
                 OBJ obj = await reader.Load(objPath);
+                StepLogger.Log($"WorldControl.Load: OBJ loaded, objects={obj.Objects?.Count ?? 0}");
                 foreach (var mapObj in obj.Objects)
                 {
                     var instance = WorldObjectFactory.CreateMapTileObject(this, mapObj);
                     if (instance != null) tasks.Add(instance.Load());
                 }
+                StepLogger.Log($"WorldControl.Load: OBJ tasks queued={tasks.Count}");
             }
 
-            // tasks.Add(Container.Load());
+            StepLogger.Log($"WorldControl.Load: awaiting {tasks.Count} object tasks");
             await Task.WhenAll(tasks);
+            StepLogger.Log("WorldControl.Load: object tasks done");
 
             // Play or stop background music
             if (!string.IsNullOrEmpty(BackgroundMusicPath))
@@ -253,6 +261,8 @@ namespace Client.Main.Controls
                 SoundController.Instance.PlayAmbientSound(AmbientSoundPath);
             else
                 SoundController.Instance.StopAmbientSound();
+
+            StepLogger.Log("WorldControl.Load: complete");
         }
 
         public override void AfterLoad()
