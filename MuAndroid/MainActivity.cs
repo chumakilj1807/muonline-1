@@ -12,6 +12,7 @@ using Client.Main.Content;
 using Client.Main.Controls.UI;
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using AndroidGameActivity = Microsoft.Xna.Framework.AndroidGameActivity;
 
 namespace MuAndroid
@@ -133,50 +134,105 @@ namespace MuAndroid
             return dst;
         }
 
+        // Builds a full human-readable crash report, walking the entire inner-exception chain.
+        private static string BuildExceptionReport(string title, Exception ex)
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"=== {title} ===");
+            sb.AppendLine($"Time   : {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            sb.AppendLine($"Device : {Build.Manufacturer} {Build.Model}  Android {Build.VERSION.Release}");
+            sb.AppendLine($"ABI    : {Build.CpuAbi}");
+
+            if (ex == null)
+            {
+                sb.AppendLine("(no exception object)");
+            }
+            else
+            {
+                int depth = 0;
+                var current = ex;
+                while (current != null)
+                {
+                    string prefix = depth == 0 ? "" : $"[Inner #{depth}] ";
+                    sb.AppendLine($"{prefix}Type   : {current.GetType().FullName}");
+                    sb.AppendLine($"{prefix}Message: {current.Message}");
+                    if (!string.IsNullOrEmpty(current.StackTrace))
+                    {
+                        sb.AppendLine($"{prefix}Stack  :");
+                        sb.AppendLine(current.StackTrace);
+                    }
+                    if (current is AggregateException agg)
+                    {
+                        foreach (var inner in agg.InnerExceptions)
+                        {
+                            sb.AppendLine($"--- Aggregate inner ---");
+                            sb.AppendLine(BuildExceptionReport("inner", inner));
+                        }
+                        break;
+                    }
+                    current = current.InnerException;
+                    depth++;
+                    if (depth > 10) { sb.AppendLine("... (too many nested exceptions)"); break; }
+                }
+            }
+
+            sb.AppendLine(new string('-', 60));
+            return sb.ToString();
+        }
+
+        // Appends text to the current session log file.
+        // File: /storage/emulated/0/Download/MuAndroid_log_YYYYMMDD.txt
+        // Falls back to app internal storage if external is unavailable.
         private static string SaveCrashLog(string text)
         {
-            var ctx = Application.Context!;
-            var stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-            var name = $"MuAndroid_crash_{stamp}.txt";
-            var dirPath = Android.OS.Environment
-                            .GetExternalStoragePublicDirectory(
-                                Android.OS.Environment.DirectoryDownloads)
-                            .AbsolutePath;
-            var filePath = Path.Combine(dirPath, name);
+            Android.Util.Log.Error("MuAndroidCrash", text);
 
+            var ctx = Application.Context!;
+            var date = DateTime.Now.ToString("yyyyMMdd");
+            var name = $"MuAndroid_log_{date}.txt";
+
+            // Try external Downloads first
             try
             {
+                var dirPath = Android.OS.Environment
+                    .GetExternalStoragePublicDirectory(Android.OS.Environment.DirectoryDownloads)
+                    .AbsolutePath;
                 Directory.CreateDirectory(dirPath);
+                var filePath = Path.Combine(dirPath, name);
                 File.AppendAllText(filePath, text + System.Environment.NewLine);
                 return filePath;
             }
-            catch
+            catch { /* fall through */ }
+
+            // Android 10+: use MediaStore
+            if (OperatingSystem.IsAndroidVersionAtLeast(29))
             {
-                if (!OperatingSystem.IsAndroidVersionAtLeast(29))
+                try
                 {
-                    return "FAILED";
+                    var values = new ContentValues();
+                    values.Put(MediaStore.IMediaColumns.DisplayName, name);
+                    values.Put(MediaStore.IMediaColumns.MimeType, "text/plain");
+                    values.Put(MediaStore.IMediaColumns.RelativePath, Android.OS.Environment.DirectoryDownloads);
+                    var uri = ctx.ContentResolver!.Insert(MediaStore.Downloads.ExternalContentUri, values);
+                    if (uri != null)
+                    {
+                        using var stream = ctx.ContentResolver.OpenOutputStream(uri)!;
+                        using var sw = new System.IO.StreamWriter(stream);
+                        sw.Write(text);
+                        return $"/storage/emulated/0/Download/{name}";
+                    }
                 }
-
-                var values = new ContentValues();
-                values.Put(MediaStore.IMediaColumns.DisplayName, name);
-                values.Put(MediaStore.IMediaColumns.MimeType, "text/plain");
-                values.Put(MediaStore.IMediaColumns.RelativePath,
-                           Android.OS.Environment.DirectoryDownloads);
-
-                var uri = ctx.ContentResolver!
-                               .Insert(MediaStore.Downloads.ExternalContentUri, values);
-
-                if (uri == null)
-                {
-                    return "FAILED";
-                }
-
-                using var stream = ctx.ContentResolver.OpenOutputStream(uri)!;
-                using var sw = new StreamWriter(stream);
-                sw.Write(text);
-
-                return $"/storage/emulated/0/Download/{name}";
+                catch { /* fall through */ }
             }
+
+            // Last resort: app-private files dir (readable via adb pull)
+            try
+            {
+                var internalPath = Path.Combine(ctx.FilesDir!.AbsolutePath, name);
+                File.AppendAllText(internalPath, text + System.Environment.NewLine);
+                return internalPath;
+            }
+            catch { return "LOG_WRITE_FAILED"; }
         }
         private void ApplyAndroidDefaults()
         {
@@ -229,33 +285,37 @@ namespace MuAndroid
             // IMPORTANT: Determine screen size BEFORE creating the game
             DetermineScreenSize();
 
-            // Global crash handler
+            // --- Crash / error handlers (catch .NET exceptions before Android kills the process) ---
             AppDomain.CurrentDomain.UnhandledException += (_, e) =>
             {
-                var exception = (Exception)e.ExceptionObject;
-                var msg = $"=== UNHANDLED EXCEPTION ===\n" +
-                         $"Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}\n" +
-                         $"Message: {exception.Message}\n" +
-                         $"Type: {exception.GetType().FullName}\n" +
-                         $"Stack Trace:\n{exception.StackTrace}\n";
+                var ex = e.ExceptionObject as Exception;
+                SaveCrashLog(BuildExceptionReport("UNHANDLED EXCEPTION", ex));
+            };
 
-                if (exception.InnerException != null)
-                {
-                    msg += $"\nInner Exception:\n{exception.InnerException}\n";
-                }
+            TaskScheduler.UnobservedTaskException += (_, e) =>
+            {
+                SaveCrashLog(BuildExceptionReport("UNOBSERVED TASK EXCEPTION", e.Exception));
+                e.SetObserved();
+            };
 
-                var path = SaveCrashLog(msg);
-                Android.Util.Log.Error("MuAndroidCrash", $"CRASH! Saved to: {path}\n{msg}");
+            AndroidEnvironment.UnhandledExceptionRaiser += (_, e) =>
+            {
+                SaveCrashLog(BuildExceptionReport("ANDROID UNHANDLED EXCEPTION", e.Exception));
+                e.Handled = true;
             };
 
             try
             {
-                var startMsg = $"=== MuAndroid Starting ===\n" +
-                              $"Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}\n" +
-                              $"Android Version: {Build.VERSION.SdkInt}\n" +
-                              $"Device: {Build.Manufacturer} {Build.Model}\n" +
-                              $"Screen: {ScreenWidth}x{ScreenHeight}\n";
+                var startMsg =
+                    $"=== MuAndroid Session Start ===\n" +
+                    $"Time       : {DateTime.Now:yyyy-MM-dd HH:mm:ss}\n" +
+                    $"Android    : {Build.VERSION.SdkInt} ({Build.VERSION.Release})\n" +
+                    $"Device     : {Build.Manufacturer} {Build.Model}\n" +
+                    $"ABI        : {Build.CpuAbi}\n" +
+                    $"Screen     : {ScreenWidth}x{ScreenHeight}\n" +
+                    $"Runtime    : {System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription}\n";
                 SaveCrashLog(startMsg);
+                Android.Util.Log.Info("MuAndroid", startMsg);
 
                 _game = new Client.Main.MuGame();
 
@@ -273,11 +333,9 @@ namespace MuAndroid
             }
             catch (Exception ex)
             {
-                var msg = $"=== STARTUP EXCEPTION ===\n" +
-                         $"Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}\n" +
-                         $"Exception during startup:\n{ex}\n";
-                var path = SaveCrashLog(msg);
-                Android.Util.Log.Error("MuAndroidCrash", $"Startup failed! Saved to: {path}\n{msg}");
+                var report = BuildExceptionReport("STARTUP EXCEPTION", ex);
+                var path = SaveCrashLog(report);
+                Android.Util.Log.Error("MuAndroidCrash", $"Startup failed! Log: {path}\n{report}");
                 throw;
             }
         }
