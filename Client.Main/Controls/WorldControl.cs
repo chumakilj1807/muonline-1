@@ -237,7 +237,7 @@ namespace Client.Main.Controls
             {
                 var reader = new OBJReader();
                 OBJ obj = await reader.Load(objPath);
-                StepLogger.Log($"WorldControl.Load: OBJ loaded, objects={obj.Objects?.Count ?? 0}");
+                StepLogger.Log($"WorldControl.Load: OBJ loaded, objects={obj.Objects?.Count.ToString() ?? "null"}");
                 foreach (var mapObj in obj.Objects)
                 {
                     var instance = WorldObjectFactory.CreateMapTileObject(this, mapObj);
