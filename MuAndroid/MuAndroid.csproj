@@ -16,14 +16,13 @@
     <MonoGamePlatform>Android</MonoGamePlatform>
 
     <!-- Fix Mono JIT crash on ARM64 (mini-arm64.c:6036 assertion failure).
-         RunAOTCompilation=true: compile ALL managed code to native ARM64 at build time.
-         UseInterpreter=true: anything not AOT-compiled uses interpreter, never JIT.
-         EnableLLVM=false: use Mono backend (LLVM has its own ARM64 issues).
-         AndroidEnableProfiledAot=false: full AOT of every assembly, not just profiled paths. -->
+         RunAOTCompilation=true: AOT-compile ALL managed assemblies to native ARM64
+         at build time so the JIT is never invoked at runtime.
+         EnableLLVM=false: use the Mono AOT backend (LLVM has its own ARM64 issues).
+         Note: UseInterpreter cannot be combined with RunAOTCompilation in Release
+         (XA0119); SDK automatically picks AOT-only for Release builds. -->
     <RunAOTCompilation>true</RunAOTCompilation>
     <EnableLLVM>false</EnableLLVM>
-    <UseInterpreter>true</UseInterpreter>
-    <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
 
     <!-- Disable Fast Deployment for Debug builds -->
     <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>

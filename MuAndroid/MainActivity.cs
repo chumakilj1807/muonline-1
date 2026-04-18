@@ -4,6 +4,7 @@ using Android.Content;
 using Android.Content.PM;
 using Android.OS;
 using Android.Provider;
+using Android.Runtime;
 using Android.Util;
 using Android.Views;
 using Client.Data.Texture;
@@ -12,7 +13,6 @@ using Client.Main.Content;
 using Client.Main.Controls.UI;
 using System;
 using System.IO;
-using System.Runtime.InteropServices;
 using AndroidGameActivity = Microsoft.Xna.Framework.AndroidGameActivity;
 
 namespace MuAndroid
@@ -141,7 +141,7 @@ namespace MuAndroid
             sb.AppendLine($"=== {title} ===");
             sb.AppendLine($"Time   : {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
             sb.AppendLine($"Device : {Build.Manufacturer} {Build.Model}  Android {Build.VERSION.Release}");
-            sb.AppendLine($"ABI    : {Build.CpuAbi}");
+            sb.AppendLine($"ABI    : {string.Join(",", Build.SupportedAbis ?? Array.Empty<string>())}");
 
             if (ex == null)
             {
@@ -161,11 +161,11 @@ namespace MuAndroid
                         sb.AppendLine($"{prefix}Stack  :");
                         sb.AppendLine(current.StackTrace);
                     }
-                    if (current is AggregateException agg)
+                    if (current is System.AggregateException agg)
                     {
                         foreach (var inner in agg.InnerExceptions)
                         {
-                            sb.AppendLine($"--- Aggregate inner ---");
+                            sb.AppendLine("--- Aggregate inner ---");
                             sb.AppendLine(BuildExceptionReport("inner", inner));
                         }
                         break;
@@ -292,7 +292,7 @@ namespace MuAndroid
                 SaveCrashLog(BuildExceptionReport("UNHANDLED EXCEPTION", ex));
             };
 
-            TaskScheduler.UnobservedTaskException += (_, e) =>
+            System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (_, e) =>
             {
                 SaveCrashLog(BuildExceptionReport("UNOBSERVED TASK EXCEPTION", e.Exception));
                 e.SetObserved();
@@ -311,7 +311,7 @@ namespace MuAndroid
                     $"Time       : {DateTime.Now:yyyy-MM-dd HH:mm:ss}\n" +
                     $"Android    : {Build.VERSION.SdkInt} ({Build.VERSION.Release})\n" +
                     $"Device     : {Build.Manufacturer} {Build.Model}\n" +
-                    $"ABI        : {Build.CpuAbi}\n" +
+                    $"ABI        : {string.Join(",", Build.SupportedAbis ?? Array.Empty<string>())}\n" +
                     $"Screen     : {ScreenWidth}x{ScreenHeight}\n" +
                     $"Runtime    : {System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription}\n";
                 SaveCrashLog(startMsg);

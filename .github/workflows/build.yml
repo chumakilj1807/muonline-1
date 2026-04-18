@@ -101,8 +101,6 @@ jobs:
             -p:AcceptAndroidSdkLicenses=true `
             -p:RunAOTCompilation=true `
             -p:EnableLLVM=false `
-            -p:UseInterpreter=true `
-            -p:AndroidEnableProfiledAot=false `
             -p:AndroidKeyStore=true `
             -p:AndroidSigningKeyStore="$env:RUNNER_TEMP\release.keystore" `
             -p:AndroidSigningKeyAlias="${{ secrets.ANDROID_KEY_ALIAS }}" `
