@@ -16,13 +16,12 @@
     <MonoGamePlatform>Android</MonoGamePlatform>
 
     <!-- Fix Mono JIT crash on ARM64 (mini-arm64.c:6036 SIGABRT).
-         RunAOTCompilation=true alone is NOT enough: some generic/async code paths
-         escape AOT and fall through to JIT, triggering the assertion.
-         Solution: disable AOT entirely and enable the Mono interpreter.
-         The interpreter never invokes JIT, eliminating the crash.
-         Heavy work (OpenGL ES, textures, audio) is all native — not affected.
-         XA0119 only fires when BOTH RunAOTCompilation AND UseInterpreter are set;
-         with RunAOTCompilation absent the interpreter is accepted in Release. -->
+         .NET 10 Android SDK enables RunAOTCompilation=true by default in Release.
+         When both AOT and UseInterpreter are set, XA0119 fires and the SDK
+         silently disables the interpreter, leaving only AOT — which then hits
+         the ARM64 JIT assertion on some code paths.
+         Fix: explicitly disable AOT so the interpreter is never overridden. -->
+    <RunAOTCompilation>false</RunAOTCompilation>
     <UseInterpreter>true</UseInterpreter>
 
     <!-- Disable Fast Deployment for Debug builds -->

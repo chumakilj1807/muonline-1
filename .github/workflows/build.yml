@@ -99,6 +99,7 @@ jobs:
           dotnet publish MuAndroid/MuAndroid.csproj -c Release -f net10.0-android -o publish-android `
             -p:AndroidSdkDirectory=$env:ANDROID_SDK_ROOT `
             -p:AcceptAndroidSdkLicenses=true `
+            -p:RunAOTCompilation=false `
             -p:UseInterpreter=true `
             -p:AndroidKeyStore=true `
             -p:AndroidSigningKeyStore="$env:RUNNER_TEMP\release.keystore" `
