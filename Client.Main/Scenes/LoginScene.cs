@@ -3,6 +3,7 @@ using Client.Main.Controls.UI;
 using Client.Main.Controls.UI.Login;
 using Client.Main.Core.Client;
 using Client.Main.Core.Models;   // For ServerInfo
+using Client.Main.Core.Utilities;
 using Client.Main.Models;
 using Client.Main.Networking;
 using Client.Main.Worlds;
@@ -91,25 +92,27 @@ namespace Client.Main.Scenes
         // This method is now part of the new progress reporting system
         protected override async Task LoadSceneContentWithProgress(Action<string, float> progressCallback)
         {
-            // Overall LoginScene progress: 0.0 to 1.0
-            // Let's say Network Init is 0% to 20% (0.0 to 0.2 progress)
-            // World Loading is 20% to 70% (0.2 to 0.7 progress)
-            // Sound & UI checks are 70% to 90% (0.7 to 0.9 progress)
+            StepLogger.Log("LoginScene.LoadSceneContent: start");
 
             DisableDayNightCycleForScene();
+            StepLogger.Log("LoginScene.LoadSceneContent: DayNightCycle disabled");
             progressCallback?.Invoke("Initializing Network Manager...", 0.05f);
             _networkManager = MuGame.Network ?? throw new InvalidOperationException("NetworkManager not initialized in MuGame");
             SubscribeToNetworkEvents();
+            StepLogger.Log("LoginScene.LoadSceneContent: NetworkManager ready");
             progressCallback?.Invoke("Network Manager Ready.", 0.20f);
 
             progressCallback?.Invoke("Loading Login World...", 0.21f);
-
+            StepLogger.Log("LoginScene.LoadSceneContent: disposing old world");
             World?.Dispose();
+
+            StepLogger.Log("LoginScene.LoadSceneContent: creating NewLoginWorld");
             var loginWorld = new NewLoginWorld();
+            StepLogger.Log("LoginScene.LoadSceneContent: NewLoginWorld created");
             Controls.Add(loginWorld);
-            // Assuming NewLoginWorld.Initialize() is relatively fast.
-            // If it were slow, it would need its own progress reporting that this method would scale.
+            StepLogger.Log("LoginScene.LoadSceneContent: calling loginWorld.Initialize()");
             await loginWorld.Initialize();
+            StepLogger.Log("LoginScene.LoadSceneContent: loginWorld.Initialize() done");
             World = loginWorld;
 
             progressCallback?.Invoke("Login World Loaded.", 0.70f);
@@ -119,12 +122,15 @@ namespace Client.Main.Scenes
                 loginWorld.Terrain.AmbientLight = 0.2f;
             }
 
+            StepLogger.Log("LoginScene.LoadSceneContent: playing background music");
             progressCallback?.Invoke("Playing Login Theme...", 0.75f);
             SoundController.Instance.PlayBackgroundMusic("Music/login_theme.mp3");
+            StepLogger.Log("LoginScene.LoadSceneContent: music started");
 
             UpdateStatusLabel(_networkManager.CurrentState);
 
             progressCallback?.Invoke("Checking Connection State...", 0.80f);
+            StepLogger.Log($"LoginScene.LoadSceneContent: network state={_networkManager.CurrentState}");
             if (_networkManager.CurrentState == ClientConnectionState.Initial ||
                 _networkManager.CurrentState == ClientConnectionState.Disconnected)
             {
@@ -144,6 +150,7 @@ namespace Client.Main.Scenes
 
                 EnsureServerListPopulatedFromCache();
             }
+            StepLogger.Log("LoginScene.LoadSceneContent: complete");
             progressCallback?.Invoke("Login Scene Setup Complete.", 0.90f);
         }
 

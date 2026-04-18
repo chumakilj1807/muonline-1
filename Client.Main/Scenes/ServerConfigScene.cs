@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Client.Main.Controls.UI;
 using Client.Main.Controls.UI.Common;
 using Client.Main.Controls.UI.Login;
+using Client.Main.Core.Utilities;
 using Microsoft.Xna.Framework;
 using Microsoft.Extensions.Logging;
 using Client.Main.Controllers;
@@ -74,6 +75,7 @@ namespace Client.Main.Scenes
 
         private void OnSubmit(object sender, EventArgs e)
         {
+            StepLogger.Log("OnSubmit: start");
             _dialog.ClearError();
 
             var host = _dialog.Host?.Trim() ?? string.Empty;
@@ -96,15 +98,19 @@ namespace Client.Main.Scenes
             if (_submitted) return; // prevent double-submit
             _submitted = true;
 
+            StepLogger.Log($"OnSubmit: host={host} port={port}");
             _logger?.LogInformation("ServerConfigScene: host={Host}, port={Port}", host, port);
 
+            StepLogger.Log("OnSubmit: persisting settings");
             MuGame.AppSettings.ConnectServerHost = host;
             MuGame.AppSettings.ConnectServerPort = port;
             MuGame.PersistConnectSettings(host, port);
+            StepLogger.Log("OnSubmit: settings persisted");
 
             var network = MuGame.Network;
             if (network != null)
             {
+                StepLogger.Log("OnSubmit: updating network settings");
                 network.UpdateConnectServerSettings(host, port);
                 _ = network.ForceReconnectToConnectServerAsync().ContinueWith(t =>
                 {
@@ -113,9 +119,12 @@ namespace Client.Main.Scenes
                         _logger?.LogWarning(t.Exception, "Failed to reconnect with updated server settings; continuing to LoginScene.");
                     }
                 });
+                StepLogger.Log("OnSubmit: ForceReconnect queued");
             }
 
+            StepLogger.Log("OnSubmit: calling ChangeScene(LoginScene)");
             MuGame.Instance.ChangeScene(new LoginScene());
+            StepLogger.Log("OnSubmit: ChangeScene called");
         }
 
         public override void Dispose()

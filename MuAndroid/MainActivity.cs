@@ -11,6 +11,7 @@ using Client.Data.Texture;
 using Client.Main;
 using Client.Main.Content;
 using Client.Main.Controls.UI;
+using Client.Main.Core.Utilities;
 using System;
 using System.IO;
 using AndroidGameActivity = Microsoft.Xna.Framework.AndroidGameActivity;
@@ -304,6 +305,27 @@ namespace MuAndroid
                 e.Handled = true;
             };
 
+            // Configure StepLogger: flush every step synchronously to Downloads so it survives native crashes
+            try
+            {
+                var stepDir = Android.OS.Environment
+                    .GetExternalStoragePublicDirectory(Android.OS.Environment.DirectoryDownloads)
+                    .AbsolutePath;
+                Directory.CreateDirectory(stepDir);
+                var stepPath = Path.Combine(stepDir, $"MuAndroid_steps_{DateTime.Now:yyyyMMdd}.txt");
+                StepLogger.Write = msg =>
+                {
+                    try
+                    {
+                        File.AppendAllText(stepPath, msg + "\n");
+                        Android.Util.Log.Debug("MuStep", msg);
+                    }
+                    catch { }
+                };
+                StepLogger.Log("=== SESSION START ===");
+            }
+            catch { /* StepLogger stays with Debug.WriteLine fallback */ }
+
             try
             {
                 var startMsg =
@@ -317,11 +339,14 @@ namespace MuAndroid
                 SaveCrashLog(startMsg);
                 Android.Util.Log.Info("MuAndroid", startMsg);
 
+                StepLogger.Log("Creating MuGame instance");
                 _game = new Client.Main.MuGame();
 
+                StepLogger.Log("MuGame created OK");
                 if (!Directory.Exists(Client.Main.Constants.DataPath))
                     Directory.CreateDirectory(Client.Main.Constants.DataPath);
 
+                StepLogger.Log("Getting game view");
                 _view = (View)_game.Services.GetService(typeof(View));
                 SetContentView(_view);
 
@@ -329,7 +354,9 @@ namespace MuAndroid
                 // This ensures the DecorView is fully initialized
                 HideSystemUI();
 
+                StepLogger.Log("Calling game.Run()");
                 _game.Run();
+                StepLogger.Log("game.Run() returned");
             }
             catch (Exception ex)
             {

@@ -1,10 +1,12 @@
 ﻿using Client.Main.Controls;
+using Client.Main.Core.Utilities;
 using Client.Main.Graphics;
 using Client.Main.Objects.Player;
 using Client.Main.Objects.Worlds.Login;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
+using System.Threading.Tasks;
 
 namespace Client.Main.Worlds
 {
@@ -33,8 +35,16 @@ namespace Client.Main.Worlds
             MapTileObjects[10] = typeof(BlendedObjects);
         }
 
+        public override async Task Load()
+        {
+            StepLogger.Log("NewLoginWorld.Load: start (base.Load)");
+            await base.Load();
+            StepLogger.Log("NewLoginWorld.Load: base.Load done");
+        }
+
         public override void AfterLoad()
         {
+            StepLogger.Log("NewLoginWorld.AfterLoad: start");
             base.AfterLoad();
 
             // water animation parameters
@@ -45,6 +55,7 @@ namespace Client.Main.Worlds
 
             // TODO: We need fix CameraAnglePosition load
             Camera.Instance.Target += new Vector3(0, 0, 650);
+            StepLogger.Log("NewLoginWorld.AfterLoad: done");
         }
 
         public override void Update(GameTime time)

@@ -1,6 +1,7 @@
 using Client.Data.ATT;
 using Client.Data.MAP;
 using Client.Main.Controls.Terrain;
+using Client.Main.Core.Utilities;
 using Client.Main.Graphics;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -101,6 +102,7 @@ namespace Client.Main.Controls
 
         public override async Task Load()
         {
+            StepLogger.Log($"TerrainControl.Load: start WorldIndex={WorldIndex}");
             _loader = new TerrainLoader(WorldIndex);
 
             if (_pendingTextureMap.Count > 0 || _replaceTextureMapping)
@@ -108,38 +110,53 @@ namespace Client.Main.Controls
                 _loader.SetTextureMapping(_pendingTextureMap, _replaceTextureMapping);
             }
 
+            StepLogger.Log("TerrainControl.Load: LoadAsync start");
             _data = await _loader.LoadAsync();
+            StepLogger.Log("TerrainControl.Load: LoadAsync done");
             _pendingTextureMap.Clear();
             _replaceTextureMapping = false;
 
             if (_data == null)
             {
+                StepLogger.Log("TerrainControl.Load: _data is null, aborting");
                 Status = Models.GameControlStatus.Error;
                 return;
             }
 
-            // Initialize sub-systems in order of dependency
+            StepLogger.Log("TerrainControl.Load: creating TerrainLightManager");
             _lightManager = new TerrainLightManager(_data, this);
+            StepLogger.Log("TerrainControl.Load: creating TerrainPhysics");
             _physics = new TerrainPhysics(_data, _lightManager);
+            StepLogger.Log("TerrainControl.Load: creating WindSimulator");
             _wind = new WindSimulator(_data);
+            StepLogger.Log("TerrainControl.Load: creating TerrainVisibilityManager");
             _visibility = new TerrainVisibilityManager(_data);
+            StepLogger.Log("TerrainControl.Load: creating GrassRenderer");
             _grassRenderer = new GrassRenderer(GraphicsDevice, _data, _physics, _wind, _lightManager);
+            StepLogger.Log("TerrainControl.Load: creating TerrainRenderer");
             _renderer = new TerrainRenderer(GraphicsDevice, _data, _visibility, _lightManager, _grassRenderer)
             {
                 WorldIndex = this.WorldIndex
             };
+            StepLogger.Log("TerrainControl.Load: TerrainRenderer created");
 
-            // Post-load processing
+            StepLogger.Log("TerrainControl.Load: CreateTerrainNormals");
             _lightManager.CreateTerrainNormals();
+            StepLogger.Log("TerrainControl.Load: CreateFinalLightmap");
             _lightManager.CreateFinalLightmap(LightDirection);
+            StepLogger.Log("TerrainControl.Load: CreateHeightMapTexture");
             _renderer.CreateHeightMapTexture();
+            StepLogger.Log("TerrainControl.Load: CreateHeightMapTexture done");
 
-            // Reset grass to defaults before loading world-specific content
+            StepLogger.Log("TerrainControl.Load: GrassRenderer.LoadContent");
             _grassRenderer.LoadContent(WorldIndex);
+            StepLogger.Log("TerrainControl.Load: GrassRenderer.LoadContent done");
 
             Camera.Instance.AspectRatio = GraphicsDevice.Viewport.AspectRatio;
 
+            StepLogger.Log("TerrainControl.Load: base.Load start");
             await base.Load();
+            StepLogger.Log("TerrainControl.Load: complete");
         }
 
         public override void Update(GameTime time)

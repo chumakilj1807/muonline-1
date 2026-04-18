@@ -3,6 +3,7 @@ using Client.Main.Content;
 using Client.Main.Controllers;
 using Client.Main.Controls;
 using Client.Main.Core.Client;
+using Client.Main.Core.Utilities;
 using Client.Main.Data;
 using Client.Main.Graphics;
 using Client.Main.Networking;
@@ -529,27 +530,27 @@ namespace Client.Main
         // Private helper method for changing scenes
         private async void ChangeSceneInternal(BaseScene newScene)
         {
-            _logger.LogInformation("--- ChangeSceneInternal: Starting scene change to {SceneType}...", newScene.GetType().Name);
+            var sceneName = newScene.GetType().Name;
+            StepLogger.Log($"ChangeSceneInternal: start -> {sceneName}");
+            _logger.LogInformation("--- ChangeSceneInternal: Starting scene change to {SceneType}...", sceneName);
 
-            // Optional: Show loading screen before disposing the old scene
-            // ShowLoadingScreen();
-
-            // Dispose the old scene
             if (ActiveScene != null)
             {
+                StepLogger.Log($"ChangeSceneInternal: disposing {ActiveScene.GetType().Name}");
                 _logger.LogDebug("--- ChangeSceneInternal: Disposing previous scene ({SceneType})...", ActiveScene.GetType().Name);
                 ActiveScene.Dispose();
+                StepLogger.Log("ChangeSceneInternal: old scene disposed");
                 _logger.LogDebug("--- ChangeSceneInternal: Previous scene disposed.");
             }
-            ActiveScene = null; // Ensure there's no reference while loading the new one
+            ActiveScene = null;
 
-            // Set the new scene
             ActiveScene = newScene;
+            StepLogger.Log($"ChangeSceneInternal: ActiveScene set to {sceneName}");
             _logger.LogDebug("--- ChangeSceneInternal: ActiveScene set to {SceneType}.", ActiveScene.GetType().Name);
 
-            // Initialize/Load the new scene (assuming Initialize/Load is asynchronous)
             try
             {
+                StepLogger.Log($"ChangeSceneInternal: InitializeWithProgressReporting start");
                 _logger.LogDebug("--- ChangeSceneInternal: Starting initialization for {SceneType}...", ActiveScene.GetType().Name);
 
                 if (ActiveScene is BaseScene baseScene)
@@ -561,19 +562,17 @@ namespace Client.Main
                     await ActiveScene.Initialize();
                 }
 
+                StepLogger.Log($"ChangeSceneInternal: initialization done for {sceneName}");
                 _logger.LogDebug("--- ChangeSceneInternal: Initialization completed for {SceneType}.", ActiveScene.GetType().Name);
             }
             catch (Exception ex)
             {
+                StepLogger.Log($"ChangeSceneInternal: EXCEPTION in {sceneName}: {ex.GetType().Name}: {ex.Message}");
                 _logger.LogError(ex, "!!! ChangeSceneInternal: Exception during Initialize() for {SceneType}.", ActiveScene.GetType().Name);
-                // Handle error - maybe return to LoginScene?
-                // ActiveScene = new LoginScene(); // Emergency return
-                // await ActiveScene.Initialize();
-                return; // End scene change after error
+                return;
             }
 
-            // Optional: Hide loading screen after the new scene is loaded
-            // HideLoadingScreen();
+            StepLogger.Log($"ChangeSceneInternal: complete -> {sceneName}");
             _logger.LogInformation("<<< ChangeSceneInternal: Scene change to {SceneType} complete.", ActiveScene.GetType().Name);
         }
 
