@@ -35,7 +35,7 @@ namespace Client.Main.Controls.UI.Android
             Current = this;
         }
 
-        public void SetSkillController(Scenes.GameSceneSkillController controller)
+        internal void SetSkillController(Scenes.GameSceneSkillController controller)
         {
             _skillController = controller;
         }
@@ -170,10 +170,10 @@ namespace Client.Main.Controls.UI.Android
             _skillController.AndroidUseSkillOnNearestTarget(skill);
         }
 
-        protected override void Dispose(bool disposing)
+        public override void Dispose()
         {
             if (Current == this) Current = null;
-            base.Dispose(disposing);
+            base.Dispose();
         }
     }
 }

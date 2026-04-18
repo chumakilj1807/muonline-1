@@ -314,10 +314,10 @@ namespace Client.Main.Controls.UI.Android
             sb.DrawString(font, text, pos, color, 0, Vector2.Zero, scale, SpriteEffects.None, 0);
         }
 
-        protected override void Dispose(bool disposing)
+        public override void Dispose()
         {
-            _pixel?.Dispose();
-            base.Dispose(disposing);
+            if (_pixel != null) { _pixel.Dispose(); _pixel = null; }
+            base.Dispose();
         }
     }
 }

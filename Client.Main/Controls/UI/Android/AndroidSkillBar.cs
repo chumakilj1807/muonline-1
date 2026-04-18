@@ -24,7 +24,7 @@ namespace Client.Main.Controls.UI.Android
         private const int BigSize = 100;
         private const int SmallSize = 70;
         private const int Gap = 8;
-        private const int Margin = 20;
+        private const int SlotMargin = 20;
 
         private Texture2D _pixel;
         private SkillEntryState[] _slots = new SkillEntryState[4]; // 0=primary, 1-3=secondary
@@ -117,8 +117,8 @@ namespace Client.Main.Controls.UI.Android
         private void CalcLayout()
         {
             var vp = MuGame.Instance.GraphicsDevice.Viewport;
-            int right = vp.Width - Margin;
-            int bottom = vp.Height - Margin;
+            int right = vp.Width - SlotMargin;
+            int bottom = vp.Height - SlotMargin;
 
             // Slot 0 (primary, big) — bottom-right
             _slotRects[0] = new Rectangle(right - BigSize, bottom - BigSize, BigSize, BigSize);
@@ -232,10 +232,10 @@ namespace Client.Main.Controls.UI.Android
             sb.DrawString(font, text, pos, color, 0, Vector2.Zero, scale, SpriteEffects.None, 0);
         }
 
-        protected override void Dispose(bool disposing)
+        public override void Dispose()
         {
-            _pixel?.Dispose();
-            base.Dispose(disposing);
+            if (_pixel != null) { _pixel.Dispose(); _pixel = null; }
+            base.Dispose();
         }
     }
 }

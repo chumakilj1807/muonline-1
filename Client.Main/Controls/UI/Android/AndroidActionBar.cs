@@ -146,10 +146,10 @@ namespace Client.Main.Controls.UI.Android
             sb.Draw(_pixel, new Rectangle(rect.Right - thickness, rect.Y, thickness, rect.Height), color);
         }
 
-        protected override void Dispose(bool disposing)
+        public override void Dispose()
         {
-            _pixel?.Dispose();
-            base.Dispose(disposing);
+            if (_pixel != null) { _pixel.Dispose(); _pixel = null; }
+            base.Dispose();
         }
     }
 }

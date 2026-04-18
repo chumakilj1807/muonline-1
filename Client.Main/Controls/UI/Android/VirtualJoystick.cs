@@ -203,10 +203,10 @@ namespace Client.Main.Controls.UI.Android
             return tex;
         }
 
-        protected override void Dispose(bool disposing)
+        public override void Dispose()
         {
-            _circleTex?.Dispose();
-            base.Dispose(disposing);
+            if (_circleTex != null) { _circleTex.Dispose(); _circleTex = null; }
+            base.Dispose();
         }
     }
 }
