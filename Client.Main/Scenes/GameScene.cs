@@ -26,6 +26,7 @@ using System.Reflection;
 using System.Diagnostics.CodeAnalysis;
 using Client.Main.Controls.UI.Game.Buffs;
 using Client.Main.Controls.UI.Game.Hud;
+using Client.Main.Controls.UI.Android;
 using MUnique.OpenMU.Network.Packets;
 using Client.Main.Controllers;
 using Client.Main.Helpers;
@@ -69,6 +70,7 @@ namespace Client.Main.Scenes
         private Controls.UI.Game.Hud.ItemQuickBar _itemQuickBar; // Q/W/E/R consumable bar
         private GameSceneUiPreloadController _uiPreloadController;
         private GameSceneWindowCloseController _windowCloseController;
+        private Controls.UI.Android.AndroidHUD _androidHUD;
 
         // Performance optimization fields - track object IDs for O(1) lookups
         // ───────────────────────── Properties ─────────────────────────
@@ -181,23 +183,34 @@ namespace Client.Main.Scenes
             Controls.Add(_pauseMenu);
             _pauseMenu.BringToFront();
 
-            // Skill selection panel (independent, not child of quick slot)
+            // Skill selection panel + quick slot — desktop only
+            bool isMobileEarly = OperatingSystem.IsAndroid() || OperatingSystem.IsIOS();
             _skillSelectionPanel = new Controls.UI.Game.Skills.SkillSelectionPanel();
-            Controls.Add(_skillSelectionPanel);
+            if (!isMobileEarly) Controls.Add(_skillSelectionPanel);
 
-            // Skill quick slot
             _skillQuickSlot = new Controls.UI.Game.Skills.SkillQuickSlot(MuGame.Network.GetCharacterState());
-            _skillQuickSlot.SetSelectionPanel(_skillSelectionPanel); // Connect panel
-            Controls.Add(_skillQuickSlot);
-            _skillQuickSlot.BringToFront();
+            _skillQuickSlot.SetSelectionPanel(_skillSelectionPanel);
+            if (!isMobileEarly)
+            {
+                Controls.Add(_skillQuickSlot);
+                _skillQuickSlot.BringToFront();
+            }
+
+            // On mobile, hide the PC main HUD (HP/MP orbs etc.)
+            if (isMobileEarly) _main.Visible = false;
             _skillController = new GameSceneSkillController(this, _skillQuickSlot, _logger, _duelController.IsDuelAttackTarget);
 
-            // Item quick bar (Q/W/E/R consumables)
-            _itemQuickBar = new Controls.UI.Game.Hud.ItemQuickBar(MuGame.Network);
-            _itemQuickBar.Align = ControlAlign.HorizontalCenter | ControlAlign.Bottom;
-            _itemQuickBar.Margin = new Margin { Bottom = 60 };
-            Controls.Add(_itemQuickBar);
-            _itemQuickBar.BringToFront();
+            bool isMobile = OperatingSystem.IsAndroid() || OperatingSystem.IsIOS();
+
+            // Item quick bar (Q/W/E/R consumables) — desktop only
+            if (!isMobile)
+            {
+                _itemQuickBar = new Controls.UI.Game.Hud.ItemQuickBar(MuGame.Network);
+                _itemQuickBar.Align = ControlAlign.HorizontalCenter | ControlAlign.Bottom;
+                _itemQuickBar.Margin = new Margin { Bottom = 60 };
+                Controls.Add(_itemQuickBar);
+                _itemQuickBar.BringToFront();
+            }
 
             // Experience bar
             var experienceBar = new ExperienceBarControl(MuGame.Network.GetCharacterState());
@@ -262,6 +275,16 @@ namespace Client.Main.Scenes
             // Start pre-loading common UI assets in background to prevent freezes
             // This runs async and won't block scene initialization
             _ = _uiPreloadController.StartPreloadAsync();
+
+            // Android HUD — replaces PC UI panels on mobile
+            if (OperatingSystem.IsAndroid() || OperatingSystem.IsIOS())
+            {
+                _androidHUD = new AndroidHUD();
+                _androidHUD.SetSkillController(_skillController);
+                Controls.Add(_androidHUD);
+                _ = _androidHUD.Load();
+                _androidHUD.BringToFront();
+            }
         }
 
         public GameScene() : this(GetCharacterInfoFromState())
@@ -522,6 +545,15 @@ namespace Client.Main.Scenes
 
             var currentKeyboardState = MuGame.Instance.Keyboard;
             var previousKeyboardState = MuGame.Instance.PrevKeyboard;
+
+            // Process synthetic key presses queued by Android HUD buttons
+            while (MuGame.Instance.TryDequeueSyntheticKey(out var synKey))
+            {
+                var pressedState = new Microsoft.Xna.Framework.Input.KeyboardState(synKey);
+                var emptyState = new Microsoft.Xna.Framework.Input.KeyboardState();
+                _hotkeys?.HandleGlobal(pressedState, emptyState);
+                _hotkeys?.HandleInWorld(pressedState, emptyState);
+            }
 
             base.Update(gameTime);
             _hotkeys?.HandleGlobal(currentKeyboardState, previousKeyboardState);

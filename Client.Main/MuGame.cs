@@ -96,6 +96,11 @@ namespace Client.Main
         public KeyboardState Keyboard { get; private set; }
         public TouchCollection PrevTouchState { get; private set; }
         public TouchCollection Touch { get; private set; }
+
+        private readonly System.Collections.Concurrent.ConcurrentQueue<Microsoft.Xna.Framework.Input.Keys> _syntheticKeys = new();
+        /// <summary>Queues a synthetic key tap (pressed+released) for the next update frame.</summary>
+        public void QueueSyntheticKey(Microsoft.Xna.Framework.Input.Keys key) => _syntheticKeys.Enqueue(key);
+        public bool TryDequeueSyntheticKey(out Microsoft.Xna.Framework.Input.Keys key) => _syntheticKeys.TryDequeue(out key);
         public Point UiTouchPosition { get; private set; }
         public Ray MouseRay { get; private set; }
         /// <summary>

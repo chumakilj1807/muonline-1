@@ -57,6 +57,32 @@ namespace Client.Main.Scenes
             ClearPendingSkill();
         }
 
+        /// <summary>Called by Android UI to fire an area/targeted skill at a specific tile.</summary>
+        public bool AndroidUseAreaSkill(Core.Client.SkillEntryState skill, Vector2 targetTile)
+            => UseAreaSkill(skill, 0, targetTile);
+
+        /// <summary>Called by Android UI to fire a targeted skill at nearest enemy.</summary>
+        public bool AndroidUseSkillOnNearestTarget(Core.Client.SkillEntryState skill)
+        {
+            var hero = _scene.Hero;
+            if (hero == null || hero.IsDead) return false;
+            if (_scene.World is not WorldControl world) return false;
+
+            MonsterObject nearest = null;
+            float nearestDist = float.MaxValue;
+            foreach (var monster in world.Monsters)
+            {
+                if (monster == null || monster.IsDead) continue;
+                float dist = Vector2.Distance(hero.Location, monster.Location);
+                if (dist < nearestDist) { nearestDist = dist; nearest = monster; }
+            }
+
+            if (nearest != null)
+                return UseSkillOnTarget(skill, nearest);
+
+            return UseAreaSkill(skill, 0, hero.Location);
+        }
+
         public void HandleRightClickSkillUsage()
         {
             if (_scene.IsMouseInputConsumedThisFrame)
