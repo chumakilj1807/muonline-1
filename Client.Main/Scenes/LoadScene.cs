@@ -28,9 +28,9 @@ namespace Client.Main.Scenes
     {
         #region Constants & Configuration
 
-        // Download tuning - balanced for all platforms
-        private const int ChunkSize = 2 * 1024 * 1024;            // 2 MB per chunk (safer for mobile)
-        private const int BufferSize = 128 * 1024;                 // 128 KB read buffer
+        // Download tuning
+        private const int ChunkSize = 4 * 1024 * 1024;            // 4 MB per chunk
+        private const int BufferSize = 512 * 1024;                 // 512 KB read buffer (LAN-friendly)
         private const int MaxRetryAttempts = 3;
         private const int RetryDelayMs = 1000;
 
@@ -38,7 +38,7 @@ namespace Client.Main.Scenes
         private static readonly TimeSpan SpeedUpdateInterval = TimeSpan.FromMilliseconds(300);
 
         // Parallel chunks based on platform
-        private static int MaxParallelChunks => IsAndroid ? 4 : 6;
+        private static int MaxParallelChunks => IsAndroid ? 8 : 10;
 
         // UI Layout
         private const int ProgressBarHeight = 24;
