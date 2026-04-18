@@ -1,3 +1,4 @@
+using Client.Main.Controllers;
 using Client.Main.Controls.UI;
 using Client.Main.Helpers;
 using Client.Main.Scenes;
@@ -60,7 +61,7 @@ namespace Client.Main.Controls.UI.Android
                 if (hero != null && !hero.IsDead)
                 {
                     _visible3D = OverheadNameplateRenderer.TryProject(
-                        hero.BoundingBox, 1.6f, out _);
+                        hero.BoundingBoxWorld, 1.6f, out _);
                 }
                 else _visible3D = false;
             }
@@ -81,7 +82,7 @@ namespace Client.Main.Controls.UI.Android
             {
                 var hero = gs.Hero;
                 if (hero != null)
-                    projected = OverheadNameplateRenderer.TryProject(hero.BoundingBox, 1.6f, out screen);
+                    projected = OverheadNameplateRenderer.TryProject(hero.BoundingBoxWorld, 1.6f, out screen);
             }
 
             if (!projected) return;
