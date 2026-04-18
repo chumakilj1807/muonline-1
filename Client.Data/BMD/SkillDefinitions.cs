@@ -217,12 +217,16 @@ namespace Client.Data.BMD
             Add(218, 166);  // Berserker → PlayerSkillSleep
 
             // DARK LORD SKILLS
-            Add(78, 184);   // Fire Scream → PlayerSkillFlamestrike
-            Add(232, 176);  // Strike of Destruction → PlayerSkillBlowOfDestruction
-            Add(64, 71);    // Increase Critical Damage → PlayerSkillVitality
-            Add(65, 71);    // Electric Spike → PlayerSkillVitality
+            Add(55, 184);   // Fire Slash → PlayerSkillFlamestrike
             Add(56, 146);   // Power Slash → PlayerAttackTwoHandSwordTwo
             Add(57, 65);    // Spiral Slash → PlayerAttackSkillWheel
+            Add(60, 146);   // Force → PlayerSkillHand1
+            Add(61, 184);   // Fire Burst → PlayerSkillFlamestrike
+            Add(62, 66);    // Earthshake → PlayerAttackSkillFuryStrike
+            Add(64, 71);    // Increase Critical Damage → PlayerSkillVitality
+            Add(65, 71);    // Electric Spike → PlayerSkillVitality
+            Add(78, 184);   // Fire Scream → PlayerSkillFlamestrike
+            Add(232, 176);  // Strike of Destruction → PlayerSkillBlowOfDestruction
 
             // ELF SKILLS
             Add(234, 246);  // Recovery → PlayerRecoverSkill
@@ -315,8 +319,12 @@ namespace Client.Data.BMD
             map[56] = "Sound/eRaidShoot.wav";            // Raid (ID 56)
 
             // DARK LORD SKILLS
-            map[62] = "Sound/sDarkEarthQuake.wav";       // Earthshake (ID 62)
+            map[55] = "Sound/Darklord_firescream.wav";   // Fire Slash (ID 55)
+            map[56] = "Sound/sKnightSkill4.wav";         // Power Slash (ID 56)
+            map[57] = "Sound/sKnightSkill4.wav";         // Spiral Slash (ID 57)
+            map[60] = "Sound/sMagic.wav";                // Force (ID 60)
             map[61] = "Sound/eFirebust.wav";             // Fire Burst (ID 61)
+            map[62] = "Sound/sDarkEarthQuake.wav";       // Earthshake (ID 62)
             map[78] = "Sound/Darklord_firescream.wav";   // Fire Scream (ID 78)
 
             // SUMMONER SKILLS

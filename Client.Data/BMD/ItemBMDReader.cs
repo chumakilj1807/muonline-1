@@ -28,6 +28,8 @@ namespace Client.Data.BMD
         }
 
 
+        public List<ItemBMD> ReadFromBytes(byte[] buffer) => Read(buffer);
+
         private void XOR3(ref byte[] data)
         {
             byte[] XOR_3_KEY = { 0xFC, 0xCF, 0xAB };

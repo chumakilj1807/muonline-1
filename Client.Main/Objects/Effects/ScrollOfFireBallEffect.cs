@@ -57,11 +57,11 @@ namespace Client.Main.Objects.Effects
         private bool _lightsAdded;
         private readonly FireBallCoreModel _coreModel;
 
-        private readonly Color _coreColor = new(1f, 0.25f, 0.1f, 1f);
-        private readonly Color _glowColor = new(1f, 0.35f, 0.15f, 0.85f);
-        private readonly Color _tailColor = new(1f, 0.55f, 0.2f, 0.9f);
-        private readonly Color _sparkColor = new(1f, 0.45f, 0.18f, 1f);
-        private readonly Color _smokeColor = new(0.35f, 0.2f, 0.2f, 0.7f);
+        private readonly Color _coreColor;
+        private readonly Color _glowColor;
+        private readonly Color _tailColor;
+        private readonly Color _sparkColor;
+        private readonly Color _smokeColor;
 
         private struct SparkParticle
         {
@@ -75,7 +75,25 @@ namespace Client.Main.Objects.Effects
         }
 
         public ScrollOfFireBallEffect(Vector3 startPosition, Vector3 targetPosition, float speed = DefaultSpeed)
+            : this(startPosition, targetPosition,
+                new Color(1f, 0.25f, 0.1f, 1f),
+                new Color(1f, 0.35f, 0.15f, 0.85f),
+                new Color(1f, 0.55f, 0.2f, 0.9f),
+                new Color(1f, 0.45f, 0.18f, 1f),
+                new Color(0.35f, 0.2f, 0.2f, 0.7f),
+                speed)
+        { }
+
+        public ScrollOfFireBallEffect(Vector3 startPosition, Vector3 targetPosition,
+            Color coreColor, Color glowColor, Color tailColor, Color sparkColor, Color smokeColor,
+            float speed = DefaultSpeed)
         {
+            _coreColor = coreColor;
+            _glowColor = glowColor;
+            _tailColor = tailColor;
+            _sparkColor = sparkColor;
+            _smokeColor = smokeColor;
+
             _startPosition = startPosition;
             _targetPosition = targetPosition;
             _currentPosition = startPosition;

@@ -29,8 +29,21 @@ namespace Client.Main.Core.Utilities
             });
         }
 
+        private static byte[] LoadEmbeddedItemBmd()
+        {
+            var asm = Assembly.GetExecutingAssembly();
+            var resName = asm.GetManifestResourceNames()
+                .FirstOrDefault(n => n.EndsWith("item.bmd", StringComparison.OrdinalIgnoreCase));
+            if (resName == null) return null;
+            using var stream = asm.GetManifestResourceStream(resName);
+            if (stream == null) return null;
+            var bytes = new byte[stream.Length];
+            stream.ReadExactly(bytes);
+            return bytes;
+        }
+
         /// <summary>
-        /// Loads items.bmd from an embedded resource and builds the definition table.
+        /// Loads items.bmd — tries embedded English resource first, falls back to disk.
         /// </summary>
         private static async Task<Dictionary<(byte, short), ItemDefinition>> InitializeItemDataAsync()
         {
@@ -39,10 +52,18 @@ namespace Client.Main.Core.Utilities
             try
             {
                 var reader = new ItemBMDReader();
+                List<ItemBMD> items;
 
-                var itemsPath = Path.Combine(Constants.DataPath, "Local", "item.bmd");
-
-                var items = await reader.Load(itemsPath).ConfigureAwait(false);
+                var embeddedBytes = LoadEmbeddedItemBmd();
+                if (embeddedBytes != null)
+                {
+                    items = reader.ReadFromBytes(embeddedBytes);
+                }
+                else
+                {
+                    var itemsPath = Path.Combine(Constants.DataPath, "Local", "item.bmd");
+                    items = await reader.Load(itemsPath).ConfigureAwait(false);
+                }
 
                 foreach (var item in items)
                 {
