@@ -24,7 +24,6 @@ namespace Client.Main.Controls.UI.Android
         private Texture2D _ringTex;
         private Texture2D _circleTex;
 
-        private Vector2 _center;
         private Vector2 _knobOffset;
         private int _activeTouchId = -1;
         private bool _isActive;
@@ -46,7 +45,6 @@ namespace Client.Main.Controls.UI.Android
             _circleTex = CreateFilledCircleTexture(128);
             var vp = MuGame.Instance.GraphicsDevice.Viewport;
             _defaultCenter = new Vector2(BaseRadius + 40, vp.Height - BaseRadius - 50);
-            _center = _defaultCenter;
             await base.Load();
         }
 
@@ -70,7 +68,7 @@ namespace Client.Main.Controls.UI.Android
                         Release();
                         break;
                     }
-                    var delta = pos - _center;
+                    var delta = pos - _defaultCenter;
                     float dist = delta.Length();
                     if (dist > MaxKnobOffset)
                         delta = delta / dist * MaxKnobOffset;
@@ -87,7 +85,7 @@ namespace Client.Main.Controls.UI.Android
                     pos.X < leftBoundary && pos.Y > vp.Height * 0.3f)
                 {
                     _activeTouchId = touch.Id;
-                    _center = pos;
+                    // Fixed center — knob moves, base stays
                     _knobOffset = Vector2.Zero;
                     Direction = Vector2.Zero;
                     _isActive = true;
@@ -147,9 +145,9 @@ namespace Client.Main.Controls.UI.Android
             if (!Visible || _ringTex == null || _circleTex == null) return;
 
             var sb = GraphicsManager.Instance.Sprite;
-            Vector2 drawCenter = _isActive ? _center : _defaultCenter;
+            Vector2 drawCenter = _defaultCenter;
 
-            using (new SpriteBatchScope(sb, SpriteSortMode.Deferred, BlendState.AlphaBlend,
+            using (new SpriteBatchScope(sb, SpriteSortMode.Deferred, BlendState.NonPremultiplied,
                 SamplerState.LinearClamp, DepthStencilState.None))
             {
                 // Outer ring — semi-transparent white

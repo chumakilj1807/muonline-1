@@ -15,10 +15,11 @@ namespace Client.Main.Controls.UI.Android
 {
     public class AndroidSkillBar : UIControl
     {
-        private const int BigSize = 110;
-        private const int SmallSize = 74;
-        private const int Gap = 10;
-        private const int SlotMargin = 22;
+        private const int BigSize = 100;
+        private const int SmallSize = 68;
+        private const int Gap = 8;
+        private const int SlotMarginRight = 70;   // indent from right edge
+        private const int SlotMarginBottom = 90;  // indent from bottom (above action bar)
 
         private Texture2D _circleTex;
         private SkillEntryState[] _slots = new SkillEntryState[4];
@@ -106,26 +107,27 @@ namespace Client.Main.Controls.UI.Android
         private void CalcLayout()
         {
             var vp = MuGame.Instance.GraphicsDevice.Viewport;
-            int right = vp.Width - SlotMargin;
-            int bottom = vp.Height - SlotMargin;
+            // Anchor to bottom-right but inset enough to stay on-screen
+            int anchorX = vp.Width - SlotMarginRight;
+            int anchorY = vp.Height - SlotMarginBottom;
 
             float bigR = BigSize / 2f;
             float smallR = SmallSize / 2f;
 
-            // Slot 0 (primary big) — bottom-right
-            _slotCenters[0] = new Vector2(right - bigR, bottom - bigR);
+            // Slot 0 (primary big) — anchor point
+            _slotCenters[0] = new Vector2(anchorX - bigR, anchorY - bigR);
             _slotRadii[0] = bigR;
 
             // Slot 1 — left of big
-            _slotCenters[1] = new Vector2(right - BigSize - Gap - smallR, bottom - smallR);
+            _slotCenters[1] = new Vector2(anchorX - BigSize - Gap - smallR, anchorY - smallR);
             _slotRadii[1] = smallR;
 
             // Slot 2 — above big
-            _slotCenters[2] = new Vector2(right - bigR, bottom - BigSize - Gap - smallR);
+            _slotCenters[2] = new Vector2(anchorX - bigR, anchorY - BigSize - Gap - smallR);
             _slotRadii[2] = smallR;
 
-            // Slot 3 — above-left (diagonal)
-            _slotCenters[3] = new Vector2(right - BigSize - Gap - smallR, bottom - BigSize - Gap - smallR);
+            // Slot 3 — above-left
+            _slotCenters[3] = new Vector2(anchorX - BigSize - Gap - smallR, anchorY - BigSize - Gap - smallR);
             _slotRadii[3] = smallR;
         }
 
@@ -137,7 +139,7 @@ namespace Client.Main.Controls.UI.Android
             var sb = GraphicsManager.Instance.Sprite;
             var font = GraphicsManager.Instance.Font;
 
-            using (new SpriteBatchScope(sb, SpriteSortMode.Deferred, BlendState.AlphaBlend,
+            using (new SpriteBatchScope(sb, SpriteSortMode.Deferred, BlendState.NonPremultiplied,
                 SamplerState.LinearClamp, DepthStencilState.None))
             {
                 for (int i = 0; i < 4; i++)

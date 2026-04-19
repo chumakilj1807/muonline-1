@@ -187,7 +187,7 @@ namespace Client.Main.Controls.UI.Android
 
             float pulse = 0.7f + 0.3f * MathF.Sin((float)gameTime.TotalGameTime.TotalSeconds * 4f);
 
-            using (new SpriteBatchScope(sb, SpriteSortMode.Deferred, BlendState.AlphaBlend,
+            using (new SpriteBatchScope(sb, SpriteSortMode.Deferred, BlendState.NonPremultiplied,
                 SamplerState.LinearClamp, DepthStencilState.None))
             {
                 // Thin ring only — draw as outer circle minus a slightly smaller circle

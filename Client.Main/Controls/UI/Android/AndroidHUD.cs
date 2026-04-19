@@ -72,6 +72,10 @@ namespace Client.Main.Controls.UI.Android
             await _hpBar.Load();
 
             await base.Load();
+
+            // Action bar and skill bar always on top of HUD
+            _actionBar.BringToFront();
+            _skillBar.BringToFront();
         }
 
         private void WireActionBar()

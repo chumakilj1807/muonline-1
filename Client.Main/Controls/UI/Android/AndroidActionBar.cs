@@ -105,7 +105,7 @@ namespace Client.Main.Controls.UI.Android
             var sb = GraphicsManager.Instance.Sprite;
             var font = GraphicsManager.Instance.Font;
 
-            using (new SpriteBatchScope(sb, SpriteSortMode.Deferred, BlendState.AlphaBlend,
+            using (new SpriteBatchScope(sb, SpriteSortMode.Deferred, BlendState.NonPremultiplied,
                 SamplerState.LinearClamp, DepthStencilState.None))
             {
                 for (int i = 0; i < 6; i++)

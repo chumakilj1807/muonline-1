@@ -91,7 +91,7 @@ namespace Client.Main.Controls.UI.Android
             int by = (int)screen.Y - (BarHeight * 2 + BarSpacing + 6);
 
             var sb = GraphicsManager.Instance.Sprite;
-            using (new SpriteBatchScope(sb, SpriteSortMode.Deferred, BlendState.AlphaBlend,
+            using (new SpriteBatchScope(sb, SpriteSortMode.Deferred, BlendState.NonPremultiplied,
                 SamplerState.LinearClamp, DepthStencilState.None))
             {
                 DrawBar(sb, bx, by, _hpDisplayRatio,
