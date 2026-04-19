@@ -17,7 +17,7 @@ namespace Client.Main.Controls.UI.Android
         private const float KnobRadius = 38f;
         private const float MaxKnobOffset = BaseRadius - KnobRadius;
         private const float DeadZone = 0.12f;
-        private const float MoveIntervalMs = 120f;
+        private const float MoveIntervalMs = 80f;
 
         // ring texture (donut) and filled circle for knob
         private Texture2D _ringTex;
@@ -116,7 +116,8 @@ namespace Client.Main.Controls.UI.Android
             }
             else
             {
-                _moveTimer = MoveIntervalMs;
+                // Reset to 0 so brief taps (<MoveIntervalMs) don't trigger movement
+                _moveTimer = 0;
             }
         }
 

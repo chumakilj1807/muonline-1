@@ -1,10 +1,13 @@
+using Client.Data.BMD;
 using Client.Main.Controllers;
 using Client.Main.Controls.UI;
 using Client.Main.Core.Client;
+using Client.Main.Core.Utilities;
 using Client.Main.Scenes;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input.Touch;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Client.Main.Controls.UI.Android
 {
@@ -28,6 +31,7 @@ namespace Client.Main.Controls.UI.Android
         private AreaTargetSelector _areaSelector;
 
         private Scenes.GameSceneSkillController _skillController;
+        private bool _slotsAutoPopulated;
 
         public AndroidHUD()
         {
@@ -52,9 +56,13 @@ namespace Client.Main.Controls.UI.Android
             _skillMenu = new AndroidSkillMenu();
             Controls.Add(_skillMenu);
             await _skillMenu.Load();
-            _skillMenu.SkillAssigned = (skill, slot) => _skillBar?.AssignSkill(skill, slot);
+            _skillMenu.SkillAssigned = (skill, slot) =>
+            {
+                _skillBar?.AssignSkill(skill, slot);
+                _slotsAutoPopulated = true; // user overrode; don't re-auto-fill
+            };
 
-            _skillBar = new AndroidSkillBar(_areaSelector, _skillMenu);
+            _skillBar = new AndroidSkillBar(_skillMenu);
             Controls.Add(_skillBar);
             await _skillBar.Load();
 
@@ -88,7 +96,6 @@ namespace Client.Main.Controls.UI.Android
 
             _actionBar.OnTeleportButton = () =>
             {
-                // Simulate M key press to open map / trigger teleport
                 var state = MuGame.Network?.GetCharacterState();
                 var teleport = state != null ? FindTeleportSkill(state) : null;
                 if (teleport != null)
@@ -107,14 +114,40 @@ namespace Client.Main.Controls.UI.Android
         private SkillEntryState FindTeleportSkill(Core.Client.CharacterState state)
         {
             foreach (var s in state.GetSkills())
-                if (s.SkillId == 6) return s; // TeleportSkillId = 6
+                if (s.SkillId == 6) return s;
             return null;
         }
 
         private static void SimulateKey(Microsoft.Xna.Framework.Input.Keys key)
         {
-            // Queue a synthetic key event for GameSceneHotkeys to pick up
             MuGame.Instance?.QueueSyntheticKey(key);
+        }
+
+        /// <summary>
+        /// Auto-fills skill slots with the first 4 skills from CharacterState.
+        /// Priority: offensive skills first (Area/Target), then Self buffs.
+        /// Called once after character skills arrive from server.
+        /// </summary>
+        private void TryAutoPopulateSkillSlots()
+        {
+            if (_slotsAutoPopulated || _skillBar == null) return;
+
+            var state = MuGame.Network?.GetCharacterState();
+            if (state == null) return;
+
+            var skills = state.GetSkills().ToList();
+            if (skills.Count == 0) return;
+
+            // Sort: Area/Target first (offensive), then Self (buffs)
+            var ordered = skills
+                .OrderBy(s => SkillDefinitions.GetSkillType(s.SkillId) == SkillType.Self ? 1 : 0)
+                .ThenBy(s => s.SkillId)
+                .ToList();
+
+            for (int i = 0; i < 4 && i < ordered.Count; i++)
+                _skillBar.AssignSkill(ordered[i], i);
+
+            _slotsAutoPopulated = true;
         }
 
         public override void Update(GameTime gameTime)
@@ -122,6 +155,10 @@ namespace Client.Main.Controls.UI.Android
             try
             {
                 ConsumedTouchIds.Clear();
+
+                // Try to auto-fill slots once skills arrive from server
+                if (!_slotsAutoPopulated)
+                    TryAutoPopulateSkillSlots();
 
                 if (_areaSelector != null && _areaSelector.IsActive)
                 {
@@ -149,19 +186,14 @@ namespace Client.Main.Controls.UI.Android
         public override void Draw(GameTime gameTime)
         {
             if (!Visible) return;
-            // HP bar is always drawn (world-space, no clip needed)
             _hpBar?.Draw(gameTime);
-
-            // Joystick drawn on top of game but under menus
             _joystick?.Draw(gameTime);
             _actionBar?.Draw(gameTime);
             _skillBar?.Draw(gameTime);
 
-            // Area selector overlay
             if (_areaSelector?.IsActive == true)
                 _areaSelector.Draw(gameTime);
 
-            // Skill menu (topmost)
             if (_skillMenu?.Visible == true)
                 _skillMenu.Draw(gameTime);
         }
@@ -171,6 +203,16 @@ namespace Client.Main.Controls.UI.Android
         public void InvokeAreaSkill(SkillEntryState skill, Vector2 targetTile)
         {
             if (_skillController == null) return;
+            // For area skills fired from the joystick direction, project the target ahead of hero
+            if (MuGame.Instance.ActiveScene is Scenes.GameScene gs && gs.Hero != null)
+            {
+                var hero = gs.Hero;
+                // Aim one tile ahead in facing direction so skill hits in front
+                var iso = new Vector2(
+                    (float)System.Math.Cos(hero.Angle.Z),
+                    (float)System.Math.Sin(hero.Angle.Z));
+                targetTile = hero.Location + iso * 3f; // 3 tiles ahead
+            }
             _skillController.AndroidUseAreaSkill(skill, targetTile);
         }
 

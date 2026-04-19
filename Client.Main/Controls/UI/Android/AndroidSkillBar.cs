@@ -4,7 +4,6 @@ using Client.Main.Controls.UI;
 using Client.Main.Helpers;
 using Client.Main.Core.Client;
 using Client.Main.Core.Utilities;
-using Client.Main.Objects.Player;
 using Client.Main.Scenes;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -15,25 +14,25 @@ namespace Client.Main.Controls.UI.Android
 {
     public class AndroidSkillBar : UIControl
     {
-        private const int BigSize = 100;
-        private const int SmallSize = 68;
-        private const int Gap = 8;
-        private const int SlotMarginRight = 70;   // indent from right edge
-        private const int SlotMarginBottom = 90;  // indent from bottom (above action bar)
+        private const int BigSize = 200;
+        private const int SmallSize = 136;
+        private const int Gap = 12;
+        private const int SlotMarginRight = 80;   // indent from right edge
+        private const int SlotMarginBottom = 120;  // indent from bottom (above action bar)
 
         private Texture2D _circleTex;
         private SkillEntryState[] _slots = new SkillEntryState[4];
         private double[] _cooldownDisplay = new double[4];
-        private AreaTargetSelector _areaSelector;
+        private double[] _flashTimer = new double[4];
+        private const double FlashDurationMs = 180.0;
         private AndroidSkillMenu _skillMenu;
 
         // Center points for hit-testing circles
         private Vector2[] _slotCenters = new Vector2[4];
         private float[] _slotRadii = new float[4];
 
-        public AndroidSkillBar(AreaTargetSelector areaSelector, AndroidSkillMenu skillMenu)
+        public AndroidSkillBar(AndroidSkillMenu skillMenu)
         {
-            _areaSelector = areaSelector;
             _skillMenu = skillMenu;
             Interactive = true;
         }
@@ -56,10 +55,14 @@ namespace Client.Main.Controls.UI.Android
 
             CalcLayout();
 
+            double elapsed = gameTime.ElapsedGameTime.TotalMilliseconds;
             for (int i = 0; i < 4; i++)
+            {
                 if (_cooldownDisplay[i] > 0)
-                    _cooldownDisplay[i] = Math.Max(0, _cooldownDisplay[i]
-                        - gameTime.ElapsedGameTime.TotalMilliseconds);
+                    _cooldownDisplay[i] = Math.Max(0, _cooldownDisplay[i] - elapsed);
+                if (_flashTimer[i] > 0)
+                    _flashTimer[i] = Math.Max(0, _flashTimer[i] - elapsed);
+            }
 
             var touches = MuGame.Instance.Touch;
             foreach (var touch in touches)
@@ -75,6 +78,7 @@ namespace Client.Main.Controls.UI.Android
                     if (dx * dx + dy * dy <= _slotRadii[i] * _slotRadii[i])
                     {
                         AndroidHUD.ConsumedTouchIds.Add(touch.Id);
+                        _flashTimer[i] = FlashDurationMs;
                         try { OnSlotTapped(i); } catch { }
                         break;
                     }
@@ -89,25 +93,21 @@ namespace Client.Main.Controls.UI.Android
 
             var skillType = SkillDefinitions.GetSkillType(skill.SkillId);
 
-            if (skillType == SkillType.Area)
+            if (skillType == SkillType.Target)
             {
-                // Show area target ring; skill fires when user confirms location
-                if (_areaSelector == null) return;
-                HeroObject hero = null;
-                if (MuGame.Instance.ActiveScene is Scenes.GameScene gs)
-                    hero = gs.Hero;
-                if (hero != null)
-                    _areaSelector.Activate(skill, hero.Location);
-            }
-            else if (skillType == SkillType.Target)
-            {
-                // Fire once at nearest visible monster
+                // Fire at nearest visible monster (falls back to hero location if no target)
                 AndroidHUD.Current?.InvokeDirectSkill(skill);
+            }
+            else if (skillType == SkillType.Self)
+            {
+                // Self buff/cast — fires immediately at hero
+                AndroidHUD.Current?.InvokeSelfSkill(skill);
             }
             else
             {
-                // Self skill — fire once, no target needed
-                AndroidHUD.Current?.InvokeSelfSkill(skill);
+                // Area skill — fire immediately in hero's facing direction
+                if (MuGame.Instance.ActiveScene is Scenes.GameScene gs && gs.Hero != null)
+                    AndroidHUD.Current?.InvokeAreaSkill(skill, gs.Hero.Location);
             }
         }
 
@@ -161,68 +161,103 @@ namespace Client.Main.Controls.UI.Android
             var skill = _slots[slot];
             var type = skill != null ? SkillDefinitions.GetSkillType(skill.SkillId) : SkillType.Self;
 
-            // Outer glow ring
+            bool isFlashing = _flashTimer[slot] > 0;
+            float flashAlpha = isFlashing ? (float)(_flashTimer[slot] / FlashDurationMs) : 0f;
+
+            // Outer glow ring — brighter on flash
             Color ringColor = slot == 0
                 ? new Color(255, 200, 50, 180)
                 : new Color(150, 160, 220, 150);
-            DrawCircle(sb, center, r + 5, ringColor * 0.5f);
+            if (isFlashing) ringColor = Color.White;
+            DrawCircle(sb, center, r + 8, ringColor * (0.5f + flashAlpha * 0.4f));
 
-            // Background fill
+            // Background fill — type-specific color
             Color bgColor = skill != null
-                ? (type == SkillType.Area ? new Color(160, 60, 10, 210)
-                 : type == SkillType.Target ? new Color(130, 100, 10, 210)
-                 : new Color(20, 70, 160, 210))
+                ? GetSkillBgColor(skill.SkillId, type)
                 : new Color(30, 30, 55, 190);
             DrawCircle(sb, center, r, bgColor);
 
-            // Inner highlight (top half lighter)
-            DrawCircle(sb, center - new Vector2(0, r * 0.2f), r * 0.6f, Color.White * 0.06f);
+            // Flash overlay
+            if (isFlashing)
+                DrawCircle(sb, center, r - 4, Color.White * (flashAlpha * 0.35f));
 
-            // Border ring
-            DrawCircle(sb, center, r, ringColor * 0.8f);
-            DrawCircle(sb, center, r - 4, bgColor);  // re-fill to make ring look thin
+            // Inner highlight
+            DrawCircle(sb, center - new Vector2(0, r * 0.18f), r * 0.6f, Color.White * 0.07f);
 
+            // Border ring (thin)
+            DrawCircle(sb, center, r, ringColor * 0.85f);
+            DrawCircle(sb, center, r - 5, bgColor);
+
+            // Cooldown dark overlay
             if (_cooldownDisplay[slot] > 0)
-            {
-                DrawCircle(sb, center, r - 4, new Color(0, 0, 0, 160));
-            }
+                DrawCircle(sb, center, r - 5, new Color(0, 0, 0, 170));
 
-            // Text
+            // Text rendering
             if (font != null)
             {
                 if (skill != null)
                 {
-                    // Type letter centered
-                    string letter = type == SkillType.Area ? "A" : type == SkillType.Target ? "T" : "S";
-                    Color lc = type == SkillType.Area ? Color.OrangeRed
-                             : type == SkillType.Target ? Color.Yellow : Color.LightGreen;
-                    float letterScale = slot == 0 ? 1.1f : 0.75f;
-                    DrawTextCentered(sb, font, letter, center + new Vector2(0, -r * 0.15f), lc, letterScale);
-
-                    // Skill name (small, at bottom of circle)
+                    // Skill name — up to 9 chars, centered
                     string name = SkillDatabase.GetSkillName(skill.SkillId);
-                    if (name.Length > 7) name = name[..7];
-                    float nameScale = slot == 0 ? 0.42f : 0.36f;
+                    if (name.Length > 9) name = name[..9];
+                    float nameScale = slot == 0 ? 0.7f : 0.52f;
                     var nameSize = font.MeasureString(name) * nameScale;
-                    var namePos = new Vector2(center.X - nameSize.X / 2f, center.Y + r * 0.45f);
-                    sb.DrawString(font, name, namePos + Vector2.One, Color.Black * 0.7f, 0, Vector2.Zero, nameScale, SpriteEffects.None, 0);
-                    sb.DrawString(font, name, namePos, Color.White * 0.85f, 0, Vector2.Zero, nameScale, SpriteEffects.None, 0);
+                    var namePos = new Vector2(center.X - nameSize.X / 2f, center.Y - nameSize.Y / 2f + r * 0.05f);
+                    sb.DrawString(font, name, namePos + new Vector2(1, 1), Color.Black * 0.75f, 0, Vector2.Zero, nameScale, SpriteEffects.None, 0);
+                    sb.DrawString(font, name, namePos, Color.White, 0, Vector2.Zero, nameScale, SpriteEffects.None, 0);
 
-                    // Level (top-right arc)
+                    // Type badge (small, top-left arc)
+                    string badge = type == SkillType.Area ? "AOE" : type == SkillType.Target ? "TGT" : "BUF";
+                    Color badgeCol = type == SkillType.Area ? new Color(255, 120, 30)
+                                   : type == SkillType.Target ? new Color(255, 230, 50)
+                                   : new Color(80, 220, 120);
+                    float badgeScale = slot == 0 ? 0.38f : 0.30f;
+                    var badgeSize = font.MeasureString(badge) * badgeScale;
+                    var badgePos = new Vector2(center.X - r * 0.6f, center.Y - r * 0.72f);
+                    sb.DrawString(font, badge, badgePos, badgeCol * 0.9f, 0, Vector2.Zero, badgeScale, SpriteEffects.None, 0);
+
+                    // Level label (bottom-right)
                     string lvl = $"Lv{skill.SkillLevel}";
-                    float lvlScale = 0.38f;
+                    float lvlScale = slot == 0 ? 0.42f : 0.32f;
                     var lvlSize = font.MeasureString(lvl) * lvlScale;
-                    var lvlPos = new Vector2(center.X + r * 0.4f - lvlSize.X / 2f, center.Y - r * 0.82f);
-                    sb.DrawString(font, lvl, lvlPos, Color.White * 0.75f, 0, Vector2.Zero, lvlScale, SpriteEffects.None, 0);
+                    var lvlPos = new Vector2(center.X + r * 0.25f, center.Y + r * 0.52f);
+                    sb.DrawString(font, lvl, lvlPos, Color.White * 0.7f, 0, Vector2.Zero, lvlScale, SpriteEffects.None, 0);
                 }
                 else
                 {
-                    // Empty slot number
+                    // Empty slot — show slot number
                     string num = $"{slot + 1}";
-                    float numScale = slot == 0 ? 0.9f : 0.65f;
-                    DrawTextCentered(sb, font, num, center, new Color(100, 110, 140, 180), numScale);
+                    float numScale = slot == 0 ? 1.4f : 0.95f;
+                    DrawTextCentered(sb, font, num, center, new Color(80, 90, 120, 160), numScale);
+                    // Small hint text
+                    string hint = "TAP+";
+                    float hintScale = slot == 0 ? 0.36f : 0.28f;
+                    var hintSize = font.MeasureString(hint) * hintScale;
+                    var hintPos = new Vector2(center.X - hintSize.X / 2f, center.Y + r * 0.45f);
+                    sb.DrawString(font, hint, hintPos, new Color(80, 90, 120, 120), 0, Vector2.Zero, hintScale, SpriteEffects.None, 0);
                 }
             }
+        }
+
+        private static Color GetSkillBgColor(int skillId, SkillType type)
+        {
+            // Dark Lord skills: fire-themed (55-79, 230-238)
+            bool isDarkLord = (skillId >= 55 && skillId <= 79) || (skillId >= 230 && skillId <= 238);
+            if (isDarkLord)
+            {
+                return type switch
+                {
+                    SkillType.Area => new Color(180, 50, 10, 215),
+                    SkillType.Target => new Color(160, 80, 10, 215),
+                    _ => new Color(60, 20, 140, 215),
+                };
+            }
+            return type switch
+            {
+                SkillType.Area => new Color(160, 60, 10, 210),
+                SkillType.Target => new Color(130, 100, 10, 210),
+                _ => new Color(20, 70, 160, 210),
+            };
         }
 
         private void DrawCircle(SpriteBatch sb, Vector2 center, float radius, Color color)
