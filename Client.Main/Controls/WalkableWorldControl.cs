@@ -78,7 +78,7 @@ namespace Client.Main.Controls
         {
             Objects.Add(_cursor = new CursorObject());
             if (OperatingSystem.IsAndroid() || OperatingSystem.IsIOS())
-                _cursor.Visible = false;
+                _cursor.Hidden = true;
             await base.Load();
         }
 

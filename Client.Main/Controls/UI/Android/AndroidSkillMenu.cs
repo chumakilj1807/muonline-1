@@ -27,7 +27,6 @@ namespace Client.Main.Controls.UI.Android
         private List<SkillMenuItem> _items = new();
         private SkillMenuItem _pendingSkill;
         private bool _awaitingSlotChoice;
-        private int _scrollOffset;
         private float _scrollY;
         private Vector2 _lastTouchPos;
         private bool _dragging;

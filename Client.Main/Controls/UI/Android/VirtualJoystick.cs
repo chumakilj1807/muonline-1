@@ -202,7 +202,7 @@ namespace Client.Main.Controls.UI.Android
                     {
                         float t = (dist - inner) / ringWidth;         // 0 at inner, 1 at outer
                         float edgeFade = MathF.Min(t * 3f, (1f - t) * 3f); // fade at both edges
-                        alpha = MathF.Clamp(edgeFade, 0f, 1f);
+                        alpha = Math.Clamp(edgeFade, 0f, 1f);
                     }
                     data[y * size + x] = new Color(1f, 1f, 1f, alpha);
                 }
@@ -224,7 +224,7 @@ namespace Client.Main.Controls.UI.Android
                 {
                     float dx = x - cx, dy = y - cy;
                     float dist = MathF.Sqrt(dx * dx + dy * dy);
-                    float alpha = MathF.Clamp(1f - MathF.Max(0f, dist - r + 2f) / 2f, 0f, 1f);
+                    float alpha = Math.Clamp(1f - MathF.Max(0f, dist - r + 2f) / 2f, 0f, 1f);
                     data[y * size + x] = new Color(1f, 1f, 1f, alpha);
                 }
             }

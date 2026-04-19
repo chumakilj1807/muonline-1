@@ -25,7 +25,6 @@ namespace Client.Main.Controls.UI.Android
         private Texture2D _circleTex;
         private SkillEntryState _skill;
         private Vector2 _targetTile;
-        private bool _isDragging;
         private int _dragTouchId = -1;
         private double _attackTimer;
         private bool _autoAttacking;
@@ -52,7 +51,7 @@ namespace Client.Main.Controls.UI.Android
             _targetTile = initialTile;
             _attackTimer = AutoAttackIntervalMs; // fire immediately
             _autoAttacking = true;
-            _isDragging = false;
+
             _dragTouchId = -1;
             Visible = true;
             BringToFront();
@@ -95,7 +94,7 @@ namespace Client.Main.Controls.UI.Android
                     if (_dragTouchId == -1 && pos.X > vp.Width * 0.4f)
                     {
                         _dragTouchId = touch.Id;
-                        _isDragging = true;
+
                         _targetTile = ScreenToTile(pos);
                         AndroidHUD.ConsumedTouchIds.Add(touch.Id);
                     }
@@ -108,7 +107,7 @@ namespace Client.Main.Controls.UI.Android
                 else if (touch.State == TouchLocationState.Released && touch.Id == _dragTouchId)
                 {
                     _dragTouchId = -1;
-                    _isDragging = false;
+
                     AndroidHUD.ConsumedTouchIds.Add(touch.Id);
                 }
             }
@@ -263,7 +262,7 @@ namespace Client.Main.Controls.UI.Android
                     {
                         float t = (dist - inner) / ringWidth;
                         float fade = MathF.Min(t * 4f, (1f - t) * 4f);
-                        alpha = MathF.Clamp(fade, 0f, 1f);
+                        alpha = Math.Clamp(fade, 0f, 1f);
                     }
                     data[y * size + x] = new Color(1f, 1f, 1f, alpha);
                 }
