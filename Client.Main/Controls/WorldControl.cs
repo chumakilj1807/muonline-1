@@ -1,4 +1,4 @@
-﻿using System.Threading;
+﻿using System;
 using Client.Data.ATT;
 using Client.Data.CAP;
 using Client.Data.OBJS;
@@ -223,7 +223,6 @@ namespace Client.Main.Controls
 
             var worldFolder = $"World{WorldIndex}";
             var dataPath = Constants.DataPath;
-            var tasks = new List<Task>();
 
             // Phase 2: camera + OBJ parse (20% → 25%)
             var capPath = Path.Combine(dataPath, worldFolder, "Camera_Angle_Position.bmd");
@@ -240,6 +239,7 @@ namespace Client.Main.Controls
 
             var objPath = Path.Combine(dataPath, worldFolder, $"EncTerrain{WorldIndex}.obj");
             StepLogger.Log($"WorldControl.Load: OBJ exists={File.Exists(objPath)}");
+            var objectsToLoad = new List<WorldObject>();
             if (File.Exists(objPath))
             {
                 var reader = new OBJReader();
@@ -249,37 +249,25 @@ namespace Client.Main.Controls
                 {
                     var instance = WorldObjectFactory.CreateMapTileObject(this, mapObj);
                     if (instance != null)
-                    {
-                        var capturedType = instance.GetType().Name;
-                        tasks.Add(instance.Load().ContinueWith(t =>
-                        {
-                            if (t.IsFaulted)
-                                StepLogger.Log($"WorldControl.Load: FAULT in {capturedType}: {t.Exception?.GetBaseException()?.Message}");
-                            else
-                                StepLogger.Log($"WorldControl.Load: loaded {capturedType} ok");
-                        }, TaskContinuationOptions.ExecuteSynchronously));
-                    }
+                        objectsToLoad.Add(instance);
                 }
-                StepLogger.Log($"WorldControl.Load: OBJ tasks queued={tasks.Count}");
+                StepLogger.Log($"WorldControl.Load: OBJ instances={objectsToLoad.Count}");
             }
 
-            // Phase 3: map objects in parallel (25% → 90%), tracked per-object
-            int total = tasks.Count;
-            int completed = 0;
+            // Phase 3: sequential load with real per-object progress (25% → 90%)
+            int total = objectsToLoad.Count;
             LoadProgress?.Invoke("Loading map objects...", 0.25f);
+            StepLogger.Log($"WorldControl.Load: loading {total} objects sequentially");
 
-            if (total > 0)
+            for (int i = 0; i < total; i++)
             {
-                var tracked = tasks.Select(t => t.ContinueWith(_ =>
-                {
-                    int done = Interlocked.Increment(ref completed);
-                    LoadProgress?.Invoke("Loading map objects...", 0.25f + 0.65f * ((float)done / total));
-                }, TaskContinuationOptions.ExecuteSynchronously)).ToList();
+                try { await objectsToLoad[i].Load(); }
+                catch (Exception ex) { StepLogger.Log($"WorldControl.Load: FAULT: {ex.GetBaseException()?.Message}"); }
 
-                StepLogger.Log($"WorldControl.Load: awaiting {total} object tasks");
-                await Task.WhenAll(tracked);
+                if (total > 0)
+                    LoadProgress?.Invoke("Loading map objects...", 0.25f + 0.65f * ((float)(i + 1) / total));
             }
-            StepLogger.Log("WorldControl.Load: object tasks done");
+            StepLogger.Log("WorldControl.Load: object loading done");
 
             // Phase 4: audio (90% → 100%)
             LoadProgress?.Invoke("Finalizing...", 0.90f);
