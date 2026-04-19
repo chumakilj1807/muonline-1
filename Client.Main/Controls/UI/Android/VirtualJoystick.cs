@@ -134,7 +134,7 @@ namespace Client.Main.Controls.UI.Android
             int dx = dir.X > 0.3f ? 1 : (dir.X < -0.3f ? -1 : 0);
             int dy = dir.Y > 0.3f ? 1 : (dir.Y < -0.3f ? -1 : 0);
 
-            var origin = new Vector2((int)hero.Location.X, (int)hero.Location.Y);
+            var origin = new Vector2((float)Math.Round(hero.Location.X), (float)Math.Round(hero.Location.Y));
             int size = Constants.TERRAIN_SIZE - 1;
 
             // Try diagonal first, then wall-slide on each axis independently
@@ -148,7 +148,7 @@ namespace Client.Main.Controls.UI.Android
             else if (dy != 0 && vert != origin && world.IsWalkable(vert)) target = vert;
 
             if (target.HasValue)
-                hero.MoveTo(target.Value, sendToServer: false, usePathfinding: false);
+                hero.MoveTo(target.Value, sendToServer: true, usePathfinding: false);
         }
 
         private void Release()
@@ -157,6 +157,8 @@ namespace Client.Main.Controls.UI.Android
             _isActive = false;
             _knobOffset = Vector2.Zero;
             Direction = Vector2.Zero;
+            if (MuGame.Instance.ActiveScene is Scenes.GameScene gs && gs.Hero != null)
+                gs.Hero.StopMoving();
         }
 
         public override void Draw(GameTime gameTime)

@@ -344,6 +344,13 @@ namespace Client.Main.Objects
             }
         }
 
+        public void StopMoving()
+        {
+            _currentPath?.Clear();
+            _movementIntent = false;
+            MoveTargetPosition = TargetPosition;
+        }
+
         public void FaceTowards(Vector2 targetLocation, bool immediate = false)
         {
             UpdateFacingFromVector(targetLocation - Location, immediate);
