@@ -1,0 +1,309 @@
+<Project>
+  <!--
+    This file is appended to AfterMicrosoftNETSdkTargets from Directory.Build.targets.
+    It is imported AFTER Microsoft.Android.Sdk.After.targets (and therefore after
+    Microsoft.Android.Sdk.Tooling.targets which defines _ResolveAndroidTooling).
+    All target definitions here WIN over SDK definitions.
+
+    Pre-set output properties so that:
+      - ValidateJavaVersion (which may spawn java.exe) is skipped
+      - ResolveAndroidTooling (which spawns aapt2.exe via Process.Start() and crashes) is skipped
+      - RuntimeIdentifierToAbi is bypassed with a hardcoded ABI list
+  -->
+
+  <PropertyGroup>
+    <!-- Java SDK 17 — output of ValidateJavaVersion task -->
+    <_JdkVersion>17.0.18</_JdkVersion>
+    <_DefaultJdkVersion>17</_DefaultJdkVersion>
+
+    <!-- Android API level (TargetPlatformVersion=36.0 in csproj) -->
+    <_AndroidApiLevel Condition="'$(_AndroidApiLevel)' == ''">36</_AndroidApiLevel>
+    <_AndroidApiLevelName>Android 16</_AndroidApiLevelName>
+
+    <!-- Build tools: 35.0.0 is installed under C:\Android\Sdk -->
+    <AndroidSdkBuildToolsVersion Condition="'$(AndroidSdkBuildToolsVersion)' == ''">35.0.0</AndroidSdkBuildToolsVersion>
+    <AndroidSdkBuildToolsPath Condition="'$(AndroidSdkBuildToolsPath)' == ''">C:\Android\Sdk\build-tools\35.0.0\</AndroidSdkBuildToolsPath>
+    <AndroidSdkBuildToolsBinPath Condition="'$(AndroidSdkBuildToolsBinPath)' == ''">C:\Android\Sdk\build-tools\35.0.0\</AndroidSdkBuildToolsBinPath>
+
+    <!-- aapt2: use bundled version from .NET Android SDK pack (v2.20) -->
+    <Aapt2ToolPath Condition="'$(Aapt2ToolPath)' == ''">C:\Program Files\dotnet\packs\Microsoft.Android.Sdk.Windows\36.1.53\tools\</Aapt2ToolPath>
+    <_Aapt2Version>2.20-13193326</_Aapt2Version>
+
+    <!-- zipalign -->
+    <ZipAlignToolPath Condition="'$(ZipAlignToolPath)' == ''">C:\Android\Sdk\build-tools\35.0.0\</ZipAlignToolPath>
+
+    <!-- apksigner -->
+    <ApkSignerJar Condition="'$(ApkSignerJar)' == ''">C:\Android\Sdk\build-tools\35.0.0\lib\apksigner.jar</ApkSignerJar>
+    <AndroidUseApkSigner Condition="'$(AndroidUseApkSigner)' == ''">true</AndroidUseApkSigner>
+
+    <!-- sequence points -->
+    <_SequencePointsMode Condition="'$(_SequencePointsMode)' == ''">None</_SequencePointsMode>
+
+    <!--
+      Pre-set JavaPlatformJarPath: only android-35 is installed; use it for android-36
+      compilation (API-compatible for stub compilation purposes).
+      Bypasses the GetJavaPlatformJar task output which would otherwise look for android-36.
+    -->
+    <JavaPlatformJarPath Condition="'$(JavaPlatformJarPath)' == ''">C:\Android\Sdk\platforms\android-35\android.jar</JavaPlatformJarPath>
+
+    <!--
+      Disable ILLink (trimmer): dotnet.exe spawned via TaskHostFactory crashes with
+      ACCESS_VIOLATION on this machine. RunILLink=false prevents the ILLink target
+      condition from passing; PublishTrimmed=false stops the Android SDK from re-enabling it.
+    -->
+    <RunILLink>false</RunILLink>
+    <PublishTrimmed>false</PublishTrimmed>
+
+    <!-- ABIs (arm64-v8a, x86_64) — must match actual RIDs built (2, not 3).
+         .NET 10 Android publish defaults to android-arm64 + android-x64 only;
+         armeabi-v7a (32-bit ARM) is not in the default RID set for .NET 10. -->
+    <AndroidSupportedAbis Condition="'$(AndroidSupportedAbis)' == ''">arm64-v8a;x86_64</AndroidSupportedAbis>
+  </PropertyGroup>
+
+  <!--
+    Override ILLink/_RunILLink: bypass dotnet.exe spawn that crashes with ACCESS_VIOLATION.
+    ILLink uses TaskHostFactory → spawns dotnet.exe via Process.Start() → hits the bug.
+    We no-op both targets: _RunILLink skips the spawn; ILLink skips the ItemGroup
+    manipulation that would otherwise remove all managed assemblies from ResolvedFileToPublish.
+    Result: larger APK (no trimming), but all assemblies are present and the APK works.
+  -->
+  <Target Name="_RunILLink">
+    <Message Text="_RunILLink: skipped (ILLink bypassed — dotnet.exe spawn crashes on this machine)" Importance="High" />
+  </Target>
+  <Target Name="ILLink" DependsOnTargets="_RunILLink">
+    <Message Text="ILLink: skipped (bypassed, assemblies untrimmed)" Importance="High" />
+  </Target>
+
+  <!--
+    Override RunContentBuilder: skip mgcb call entirely — content is pre-built as .xnb files.
+    cmd.exe crashes with ACCESS_VIOLATION (-1073741819) when spawned from Exec inside
+    the dotnet → MSBuild → C# task chain on this machine. Since the .xnb files already
+    exist in the output directory, we can safely no-op this target.
+  -->
+  <Target Name="RunContentBuilder" DependsOnTargets="PrepareContentBuilder">
+    <Message Text="RunContentBuilder: skipped (content pre-built as .xnb, mgcb bypassed)" Importance="High" />
+  </Target>
+
+  <!--
+    Override _CompileJava: bypass javac.exe spawn via C# Javac task (crashes with ACCESS_VIOLATION).
+    Call javac.exe and jar.exe DIRECTLY from Exec (no PowerShell) — powershell.exe crashes
+    when spawned in the MSBuild publish second-pass environment on this machine.
+    Chain: MSBuild Exec → cmd.exe → javac.exe / jar.exe
+  -->
+  <Target Name="_CompileJava"
+      DependsOnTargets="$(_CompileJavaDependsOnTargets);_CollectJavaSource"
+      Inputs="@(_AndroidMSBuildAllProjects);$(_AndroidCompileJavaFileList);$(MonoPlatformJarPath);@(_JavaStubFiles);@(_JavaSource)"
+      Outputs="$(_AndroidCompileJavaStampFile)">
+
+    <MakeDir Directories="$(_AndroidIntermediateJavaClassDirectory);$(IntermediateOutputPath)android\bin" />
+
+    <PropertyGroup>
+      <_JavacExePath>C:\Program Files\Eclipse Adoptium\jdk-17.0.18.8-hotspot\bin\javac.exe</_JavacExePath>
+      <_JarExePath>C:\Program Files\Eclipse Adoptium\jdk-17.0.18.8-hotspot\bin\jar.exe</_JarExePath>
+      <_AndroidToolsDir>C:\Program Files\dotnet\packs\Microsoft.Android.Sdk.Windows\36.1.53\tools</_AndroidToolsDir>
+      <_MonoAndroidJar>C:\Program Files\dotnet\packs\Microsoft.Android.Ref.36\36.1.53\ref\net10.0\mono.android.jar</_MonoAndroidJar>
+      <_JavacCp>C:\Android\Sdk\platforms\android-36\android.jar;$(_AndroidToolsDir)\java_runtime_clr.jar;$(_AndroidToolsDir)\java-interop.jar;$(_MonoAndroidJar)</_JavacCp>
+      <_JavaSrcDir>$(_AndroidIntermediateJavaSourceDirectory.TrimEnd('\'))</_JavaSrcDir>
+      <_JavaClassDir>$(_AndroidIntermediateJavaClassDirectory.TrimEnd('\'))</_JavaClassDir>
+      <_JavaRspFile>$(IntermediateOutputPath)java_sources.txt</_JavaRspFile>
+    </PropertyGroup>
+
+    <!-- Collect .java source files -->
+    <ItemGroup>
+      <_JavaSourceFiles2 Include="$(_JavaSrcDir)\**\*.java" />
+    </ItemGroup>
+
+    <!-- Write source file list (ASCII = no BOM, all paths are ASCII-safe) -->
+    <WriteLinesToFile
+        File="$(_JavaRspFile)"
+        Lines="@(_JavaSourceFiles2)"
+        Overwrite="true"
+        Encoding="ASCII" />
+
+    <!-- Evaluate classes.zip existence at target execution time via PropertyGroup -->
+    <PropertyGroup>
+      <_ClassesZipPath>$(IntermediateOutputPath)android\bin\classes.zip</_ClassesZipPath>
+      <_ClassesZipExists Condition="Exists('$(IntermediateOutputPath)android\bin\classes.zip')">true</_ClassesZipExists>
+      <_ClassesZipExists Condition="'$(_ClassesZipExists)' == ''">false</_ClassesZipExists>
+    </PropertyGroup>
+
+    <Message Text="_CompileJava: classes.zip already exists ($(IntermediateOutputPath)android\bin\classes.zip) — skipping javac+zip" Importance="High"
+        Condition="'$(_ClassesZipExists)' == 'true'" />
+
+    <!-- Run javac directly: skip if classes.zip already exists (pre-compiled via compile_java.ps1) -->
+    <Exec Command="&quot;$(_JavacExePath)&quot; -source 11 -target 11 -encoding UTF-8 -cp &quot;$(_JavacCp)&quot; -d &quot;$(_JavaClassDir)&quot; @&quot;$(_JavaRspFile)&quot;"
+        WorkingDirectory="$(MSBuildProjectDirectory)"
+        IgnoreStandardErrorWarningFormat="true"
+        Condition="'$(_ClassesZipExists)' != 'true' And '@(_JavaSourceFiles2)' != ''" />
+
+    <!-- Create classes.zip using MSBuild ZipDirectory task (skip if already exists) -->
+    <ZipDirectory
+        SourceDirectory="$(_JavaClassDir)"
+        DestinationFile="$(_ClassesZipPath)"
+        Overwrite="true"
+        Condition="'$(_ClassesZipExists)' != 'true'" />
+
+    <Touch Files="$(_AndroidCompileJavaStampFile)" AlwaysCreate="true" />
+    <ItemGroup>
+      <FileWrites Include="$(IntermediateOutputPath)android\bin\classes.zip" />
+      <FileWrites Include="$(_AndroidCompileJavaStampFile)" />
+      <FileWrites Include="$(_JavaRspFile)" />
+    </ItemGroup>
+  </Target>
+
+  <!--
+    Override _CompileResources: bypass Aapt2Compile C# task (Process.Start → ACCESS_VIOLATION).
+    Use Exec → powershell.exe → aapt2 compile instead.
+    Incremental: stamp file ensures re-run only when resource inputs change.
+  -->
+  <Target Name="_CompileResources"
+      DependsOnTargets="$(_BeforeCompileResources);_ConvertResourcesCases;_CalculateResourceFileName">
+    <MakeDir Directories="$(IntermediateOutputPath)flat" Condition="!Exists('$(IntermediateOutputPath)flat')" />
+    <PropertyGroup>
+      <!-- TrimEnd backslash: avoids "path\" breaking command parsing -->
+      <_ResDir>$(MonoAndroidResDirIntermediate.TrimEnd('\'))</_ResDir>
+      <_FlatDir>$(IntermediateOutputPath)flat</_FlatDir>
+      <_Aapt2Exe>$(Aapt2ToolPath)aapt2.exe</_Aapt2Exe>
+    </PropertyGroup>
+    <!-- Call aapt2 directly: Exec → cmd.exe → aapt2.exe (no PowerShell) -->
+    <!-- Skip if .flat files already exist (pre-compiled or from previous build) -->
+    <Exec Command="&quot;$(_Aapt2Exe)&quot; compile --dir &quot;$(_ResDir)&quot; -o &quot;$(_FlatDir)&quot;"
+        WorkingDirectory="$(MSBuildProjectDirectory)"
+        IgnoreStandardErrorWarningFormat="true"
+        Condition="!Exists('$(_FlatDir)\values_strings.arsc.flat')" />
+    <ItemGroup>
+      <FileWrites Include="$(IntermediateOutputPath)flat\*.flat" />
+    </ItemGroup>
+  </Target>
+
+  <!--
+    Override _UpdateAndroidResgenAapt2: no-op for Release builds.
+    This target generates resources.apk + R.java only for the IDE resource designer.
+    The actual APK resources are produced by _CreateBaseApkWithAapt2 (separate target).
+    aapt2 link crashes with ACCESS_VIOLATION when spawned from MSBuild context
+    (works fine in direct PowerShell), so we skip this designer-only step entirely.
+    Nothing downstream in the Release APK pipeline depends on its output.
+  -->
+  <Target Name="_UpdateAndroidResgenAapt2">
+    <Message Text="_UpdateAndroidResgenAapt2: skipped (designer-only, not needed for Release APK)" Importance="High" />
+  </Target>
+
+  <!--
+    Override _CreateBaseApkWithAapt2: bypass Aapt2Link C# task.
+    Calls aapt2.exe DIRECTLY from Exec (no PowerShell intermediary) to avoid
+    powershell.exe crashing in the MSBuild publish second-pass environment.
+    Chain: MSBuild Exec → cmd.exe → aapt2.exe (one fewer process level).
+    Uses WriteLinesToFile to build the response file (no BOM with ASCII encoding).
+  -->
+  <Target Name="_CreateBaseApkWithAapt2"
+      Inputs="$(IntermediateOutputPath)android\AndroidManifest.xml;@(_FlatFilesForApk)"
+      Outputs="$(_PackagedResources)">
+    <ItemGroup>
+      <_FlatFilesForApk Include="$(IntermediateOutputPath)flat\*.flat" />
+    </ItemGroup>
+    <PropertyGroup>
+      <_BaseApkOutputDir>$(IntermediateOutputPath)android\bin</_BaseApkOutputDir>
+      <_PlatformJarApk>$(JavaPlatformJarPath.TrimEnd('\'))</_PlatformJarApk>
+      <_Aapt2ExeApk>$(Aapt2ToolPath)aapt2.exe</_Aapt2ExeApk>
+      <_FlatListFile>$(IntermediateOutputPath)flat_list_apk.txt</_FlatListFile>
+      <_ManifestApk>$(IntermediateOutputPath)android\AndroidManifest.xml</_ManifestApk>
+    </PropertyGroup>
+    <MakeDir Directories="$(_BaseApkOutputDir)" Condition="!Exists('$(_BaseApkOutputDir)')" />
+    <!-- Write flat file list as ASCII (no BOM) — aapt2 @listfile requires no BOM -->
+    <WriteLinesToFile
+        File="$(_FlatListFile)"
+        Lines="@(_FlatFilesForApk)"
+        Overwrite="true"
+        Encoding="ASCII"
+        Condition="!Exists('$(_PackagedResources)')" />
+    <!-- Call aapt2 directly: MSBuild Exec → cmd.exe → aapt2.exe (no PowerShell) -->
+    <!-- Skip if packaged_resources already exists (pre-built manually to avoid ACCESS_VIOLATION crash) -->
+    <Message Text="_CreateBaseApkWithAapt2: skipped (packaged_resources already exists)" Importance="High"
+        Condition="Exists('$(_PackagedResources)')" />
+    <Exec Command="&quot;$(_Aapt2ExeApk)&quot; link --manifest &quot;$(_ManifestApk)&quot; -I &quot;$(_PlatformJarApk)&quot; -o &quot;$(_PackagedResources)&quot; --min-sdk-version 29 --target-sdk-version 36 --no-version-vectors --rename-manifest-package MuMono.MuMono @&quot;$(_FlatListFile)&quot;"
+        WorkingDirectory="$(MSBuildProjectDirectory)"
+        IgnoreStandardErrorWarningFormat="true"
+        Condition="!Exists('$(_PackagedResources)')" />
+    <ItemGroup>
+      <FileWrites Include="$(_PackagedResources)" />
+      <FileWrites Include="$(_FlatListFile)" />
+    </ItemGroup>
+  </Target>
+
+  <!--
+    Override _ManifestMerger: bypass ManifestMerger C# task (spawns java.exe via Process.Start →
+    ACCESS_VIOLATION). Simple file copy is sufficient — this app has no AAR library manifests
+    that require actual merging. ManifestMerger from Xamarin.Android.Common.targets is imported
+    AFTER Directory.Build.targets, so this definition (in AfterMicrosoftNETSdkTargets) wins.
+  -->
+  <Target Name="_ManifestMerger"
+      Inputs="$(IntermediateOutputPath)AndroidManifest.xml;@(ExtractedManifestDocuments);$(_AndroidBuildPropertiesCache);@(_AndroidMSBuildAllProjects)"
+      Outputs="$(IntermediateOutputPath)android\AndroidManifest.xml">
+    <MakeDir Directories="$(IntermediateOutputPath)android" />
+    <Copy
+      SourceFiles="$(IntermediateOutputPath)AndroidManifest.xml"
+      DestinationFiles="$(IntermediateOutputPath)android\AndroidManifest.xml"
+      Condition="Exists('$(IntermediateOutputPath)AndroidManifest.xml')" />
+    <ItemGroup>
+      <FileWrites Include="$(IntermediateOutputPath)android\AndroidManifest.xml" />
+    </ItemGroup>
+  </Target>
+
+  <!--
+    Override _CompileNativeAssemblySources: bypass CompileNativeAssembly C# task which
+    spawns llc.exe via Process.Start() and crashes with ACCESS_VIOLATION.
+    Use Exec → powershell.exe → llc.exe instead.
+    Defined here (not in Directory.Build.targets) to ensure this definition loads LAST
+    and wins over Xamarin.Android.Common.targets (which is imported after Directory.Build.targets).
+  -->
+  <Target Name="_CompileNativeAssemblySources"
+      DependsOnTargets="_PrepareNativeAssemblyItems;_GenerateCompressedAssembliesNativeSourceFiles"
+      Inputs="@(_TypeMapAssemblySource);@(_TypeMapAssemblyInclude);@(_EnvironmentAssemblySource);@(_CompressedAssembliesAssemblySource);@(_MarshalMethodsAssemblySource);@(_AndroidRemapAssemblySource);@(_RuntimeLinkingAssemblySource)"
+      Outputs="@(_NativeAssemblyTarget)">
+    <ItemGroup>
+      <_AllLlSources2 Include="@(_TypeMapAssemblySource)" />
+      <_AllLlSources2 Include="@(_EnvironmentAssemblySource)" />
+      <_AllLlSources2 Include="@(_CompressedAssembliesAssemblySource)" />
+      <_AllLlSources2 Include="@(_MarshalMethodsAssemblySource)" />
+      <_AllLlSources2 Include="@(_AndroidRemapAssemblySource)" />
+      <_AllLlSources2 Include="@(_RuntimeLinkingAssemblySource)" />
+    </ItemGroup>
+    <!-- Call llc.exe via compile_ll.bat: Exec → cmd.exe → compile_ll.bat → llc.exe (no PowerShell) -->
+    <!-- Skip if .o already exists (persistent cache — .ll is regenerated each build but .o is stable) -->
+    <Exec
+        Command="&quot;$(MSBuildThisFileDirectory)compile_ll.bat&quot; &quot;%(_AllLlSources2.Identity)&quot; &quot;C:\Program Files\dotnet\packs\Microsoft.Android.Sdk.Windows\36.1.53\tools\binutils\bin\llc.exe&quot; 29"
+        WorkingDirectory="$(MSBuildProjectDirectory)"
+        Condition="'%(_AllLlSources2.Identity)' != '' And !Exists('$(MSBuildProjectDirectory)\%(_AllLlSources2.RelativeDir)%(_AllLlSources2.Filename).o')"
+        IgnoreStandardErrorWarningFormat="true" />
+    <ItemGroup>
+      <FileWrites Include="@(_NativeAssemblyTarget)" />
+    </ItemGroup>
+  </Target>
+
+  <!--
+    Override _CreateApplicationSharedLibraries: bypass LinkApplicationSharedLibraries C# task
+    which spawns ld.exe via Process.Start() and crashes with ACCESS_VIOLATION.
+    Skip entirely if libxamarin-app.so already exists for all ABIs (pre-built via link_so.ps1).
+    When .so is missing, the build will fail with XA3007 — run link_so.ps1 manually first.
+  -->
+  <Target Name="_CreateApplicationSharedLibraries"
+      DependsOnTargets="_CompileNativeAssemblySources;_PrepareApplicationSharedLibraryItems"
+      Condition=" '$(_AndroidEnableNativeRuntimeLinking)' != 'true' ">
+    <Message Text="_CreateApplicationSharedLibraries: using pre-built libxamarin-app.so (bypassed LinkApplicationSharedLibraries C# task)" Importance="High"
+        Condition="Exists('$(IntermediateOutputPath)app_shared_libraries\arm64-v8a\libxamarin-app.so')" />
+    <Error Text="libxamarin-app.so not found — run link_so.ps1 first: powershell -File C:\Users\admin\Downloads\muonline\link_so.ps1"
+        Condition="!Exists('$(IntermediateOutputPath)app_shared_libraries\arm64-v8a\libxamarin-app.so')" />
+    <ItemGroup>
+      <FileWrites Include="@(_ApplicationSharedLibrary)" />
+    </ItemGroup>
+  </Target>
+
+  <!-- Override _ResolveAndroidTooling: all outputs pre-set above; skip tasks that crash. -->
+  <Target Name="_ResolveAndroidTooling">
+    <PropertyGroup>
+      <_AndroidUseJavaExeVersion Condition=" '$(_AndroidUseJavaExeVersion)' == '' ">false</_AndroidUseJavaExeVersion>
+    </PropertyGroup>
+    <!-- No task calls — all output properties already set in the PropertyGroup above. -->
+  </Target>
+
+</Project>

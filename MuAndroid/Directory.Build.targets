@@ -1,0 +1,67 @@
+<Project>
+
+  <!--
+    Override _ManifestMerger: bypass java.exe crash (simple file copy, no merge needed).
+    This wins because Xamarin.Android.Common.targets (which defines _ManifestMerger) is
+    imported via NuGet package targets BEFORE Directory.Build.targets.
+  -->
+  <Target Name="_ManifestMerger"
+      Inputs="$(IntermediateOutputPath)AndroidManifest.xml;@(ExtractedManifestDocuments);$(_AndroidBuildPropertiesCache);@(_AndroidMSBuildAllProjects)"
+      Outputs="$(IntermediateOutputPath)android\AndroidManifest.xml">
+    <MakeDir Directories="$(IntermediateOutputPath)android" />
+    <Copy
+      SourceFiles="$(IntermediateOutputPath)AndroidManifest.xml"
+      DestinationFiles="$(IntermediateOutputPath)android\AndroidManifest.xml"
+      Condition="Exists('$(IntermediateOutputPath)AndroidManifest.xml')" />
+    <ItemGroup>
+      <FileWrites Include="$(IntermediateOutputPath)android\AndroidManifest.xml" />
+    </ItemGroup>
+  </Target>
+
+  <!--
+    Override _CompileNativeAssemblySources: bypass CompileNativeAssembly C# task which
+    spawns llc.exe via Process.Start() and crashes with ACCESS_VIOLATION on this machine.
+    Use MSBuild Exec (cmd.exe intermediary) -> PowerShell -> llc.exe, which works.
+    compile_one_ll.ps1 derives the LLVM target triple from the filename.
+  -->
+  <Target Name="_CompileNativeAssemblySources"
+      DependsOnTargets="_PrepareNativeAssemblyItems;_GenerateCompressedAssembliesNativeSourceFiles"
+      Inputs="@(_TypeMapAssemblySource);@(_TypeMapAssemblyInclude);@(_EnvironmentAssemblySource);@(_CompressedAssembliesAssemblySource);@(_MarshalMethodsAssemblySource);@(_AndroidRemapAssemblySource);@(_RuntimeLinkingAssemblySource)"
+      Outputs="@(_NativeAssemblyTarget)">
+    <ItemGroup>
+      <_AllLlSources Include="@(_TypeMapAssemblySource)" />
+      <_AllLlSources Include="@(_EnvironmentAssemblySource)" />
+      <_AllLlSources Include="@(_CompressedAssembliesAssemblySource)" />
+      <_AllLlSources Include="@(_MarshalMethodsAssemblySource)" />
+      <_AllLlSources Include="@(_AndroidRemapAssemblySource)" />
+      <_AllLlSources Include="@(_RuntimeLinkingAssemblySource)" />
+    </ItemGroup>
+    <Exec
+        Command="powershell.exe -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)compile_one_ll.ps1&quot; -LlcExe &quot;C:\Program Files\dotnet\packs\Microsoft.Android.Sdk.Windows\36.1.53\tools\binutils\bin\llc.exe&quot; -LlFile &quot;%(_AllLlSources.Identity)&quot; -MinSdk 29"
+        WorkingDirectory="$(MSBuildProjectDirectory)"
+        Condition="'%(_AllLlSources.Identity)' != ''" />
+    <ItemGroup>
+      <FileWrites Include="@(_NativeAssemblyTarget)" />
+    </ItemGroup>
+  </Target>
+
+  <!--
+    Append our overrides file to AfterMicrosoftNETSdkTargets so it is imported AFTER
+    Microsoft.Android.Sdk.Tooling.targets (which defines _ResolveAndroidTooling).
+    Guard: only append if the Android SDK has already added its entry to the list
+    (i.e., Microsoft.Android.Sdk.After.targets is already in the list), ensuring we
+    don't accidentally remove the Android SDK entry on early evaluation.
+  -->
+  <!--
+    Append our overrides file UNCONDITIONALLY to AfterMicrosoftNETSdkTargets.
+    Directory.Build.targets is evaluated after Android SDK .props set their entry,
+    so our file lands AFTER Microsoft.Android.Sdk.After.targets in the import list.
+    Last definition of a target wins → our overrides beat the SDK's definitions.
+    Condition removed: the '.Contains(Android.Sdk.After)' guard was False in some
+    build passes (e.g. pass 2 of multi-pass scripts), causing overrides to be skipped.
+  -->
+  <PropertyGroup>
+    <AfterMicrosoftNETSdkTargets>$(AfterMicrosoftNETSdkTargets);$(MSBuildThisFileDirectory)MuAndroid.Overrides.targets</AfterMicrosoftNETSdkTargets>
+  </PropertyGroup>
+
+</Project>

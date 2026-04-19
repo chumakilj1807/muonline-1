@@ -127,24 +127,28 @@ namespace Client.Main.Controls.UI.Android
             if (hero == null || hero.IsDead) return;
             if (gs.World is not WalkableWorldControl world) return;
 
-            var iso = new Vector2(
-                Direction.X + Direction.Y,
-                Direction.X - Direction.Y);
+            var iso = new Vector2(Direction.X + Direction.Y, Direction.X - Direction.Y);
+            var dir = Vector2.Normalize(iso);
 
-            // Try step sizes from 6 down to 1, respecting terrain walkability
-            for (int step = 6; step >= 1; step--)
-            {
-                var raw = hero.Location + iso * step;
-                var tile = new Vector2(
-                    Math.Clamp((float)Math.Round(raw.X), 0, Constants.TERRAIN_SIZE - 1),
-                    Math.Clamp((float)Math.Round(raw.Y), 0, Constants.TERRAIN_SIZE - 1));
+            // 8-directional: threshold 0.3 gives clean N/NE/E/SE/S/SW/W/NW steps
+            int dx = dir.X > 0.3f ? 1 : (dir.X < -0.3f ? -1 : 0);
+            int dy = dir.Y > 0.3f ? 1 : (dir.Y < -0.3f ? -1 : 0);
 
-                if (world.IsWalkable(tile))
-                {
-                    hero.MoveTo(tile, sendToServer: false, usePathfinding: false);
-                    return;
-                }
-            }
+            var origin = new Vector2((int)hero.Location.X, (int)hero.Location.Y);
+            int size = Constants.TERRAIN_SIZE - 1;
+
+            // Try diagonal first, then wall-slide on each axis independently
+            var diag = new Vector2(Math.Clamp(origin.X + dx, 0, size), Math.Clamp(origin.Y + dy, 0, size));
+            var horiz = new Vector2(Math.Clamp(origin.X + dx, 0, size), origin.Y);
+            var vert = new Vector2(origin.X, Math.Clamp(origin.Y + dy, 0, size));
+
+            Vector2? target = null;
+            if (diag != origin && world.IsWalkable(diag)) target = diag;
+            else if (dx != 0 && horiz != origin && world.IsWalkable(horiz)) target = horiz;
+            else if (dy != 0 && vert != origin && world.IsWalkable(vert)) target = vert;
+
+            if (target.HasValue)
+                hero.MoveTo(target.Value, sendToServer: false, usePathfinding: false);
         }
 
         private void Release()
