@@ -210,7 +210,7 @@
         Condition="!Exists('$(_PackagedResources)')" />
     <Message Text="_CreateBaseApkWithAapt2: skipped (packaged_resources already exists)" Importance="High"
         Condition="Exists('$(_PackagedResources)')" />
-    <Exec Command="&quot;$(_Aapt2ExeApk)&quot; link --manifest &quot;$(_ManifestApk)&quot; -I &quot;$(_PlatformJarApk)&quot; -o &quot;$(_PackagedResources)&quot; --min-sdk-version 29 --target-sdk-version 36 --no-version-vectors --rename-manifest-package MuMono.MuMono @&quot;$(_FlatListFile)&quot;"
+    <Exec Command="&quot;$(_Aapt2ExeApk)&quot; link --manifest &quot;$(_ManifestApk)&quot; -I &quot;$(_PlatformJarApk)&quot; -o &quot;$(_PackagedResources)&quot; --min-sdk-version 29 --target-sdk-version 36 --no-version-vectors @&quot;$(_FlatListFile)&quot;"
         WorkingDirectory="$(MSBuildProjectDirectory)"
         IgnoreStandardErrorWarningFormat="true"
         Condition="!Exists('$(_PackagedResources)')" />
