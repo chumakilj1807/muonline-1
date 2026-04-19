@@ -36,8 +36,13 @@
       <_AllLlSources Include="@(_AndroidRemapAssemblySource)" />
       <_AllLlSources Include="@(_RuntimeLinkingAssemblySource)" />
     </ItemGroup>
+    <PropertyGroup>
+      <_DbtDotNetPacksDir Condition="'$(DOTNET_ROOT)' != ''">$(DOTNET_ROOT)\packs</_DbtDotNetPacksDir>
+      <_DbtDotNetPacksDir Condition="'$(_DbtDotNetPacksDir)' == ''">C:\Program Files\dotnet\packs</_DbtDotNetPacksDir>
+      <_DbtLlcExe>$(_DbtDotNetPacksDir)\Microsoft.Android.Sdk.Windows\36.1.53\tools\binutils\bin\llc.exe</_DbtLlcExe>
+    </PropertyGroup>
     <Exec
-        Command="powershell.exe -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)compile_one_ll.ps1&quot; -LlcExe &quot;C:\Program Files\dotnet\packs\Microsoft.Android.Sdk.Windows\36.1.53\tools\binutils\bin\llc.exe&quot; -LlFile &quot;%(_AllLlSources.Identity)&quot; -MinSdk 29"
+        Command="powershell.exe -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)compile_one_ll.ps1&quot; -LlcExe &quot;$(_DbtLlcExe)&quot; -LlFile &quot;%(_AllLlSources.Identity)&quot; -MinSdk 29"
         WorkingDirectory="$(MSBuildProjectDirectory)"
         Condition="'%(_AllLlSources.Identity)' != ''" />
     <ItemGroup>

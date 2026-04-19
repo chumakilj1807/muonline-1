@@ -98,6 +98,7 @@ jobs:
         run: |
           dotnet publish MuAndroid/MuAndroid.csproj -c Release -f net10.0-android -o publish-android `
             -p:AndroidSdkDirectory=$env:ANDROID_SDK_ROOT `
+            -p:JavaSdkDirectory=$env:JAVA_HOME `
             -p:AcceptAndroidSdkLicenses=true `
             -p:RunAOTCompilation=false `
             -p:UseInterpreter=true `
