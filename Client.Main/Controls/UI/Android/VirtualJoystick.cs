@@ -16,7 +16,6 @@ namespace Client.Main.Controls.UI.Android
         private const float BaseRadius = 90f;
         private const float KnobRadius = 38f;
         private const float MaxKnobOffset = BaseRadius - KnobRadius;
-        private const float RingThickness = 10f;
         private const float DeadZone = 0.12f;
         private const float MoveIntervalMs = 120f;
 
@@ -28,7 +27,6 @@ namespace Client.Main.Controls.UI.Android
         private int _activeTouchId = -1;
         private bool _isActive;
         private double _moveTimer;
-        private Vector2 _defaultCenter;
 
         public bool IsActive => _isActive;
         public Vector2 Direction { get; private set; }
@@ -43,9 +41,13 @@ namespace Client.Main.Controls.UI.Android
         {
             _ringTex = CreateRingTexture(256, 18);
             _circleTex = CreateFilledCircleTexture(128);
-            var vp = MuGame.Instance.GraphicsDevice.Viewport;
-            _defaultCenter = new Vector2(BaseRadius + 40, vp.Height - BaseRadius - 50);
             await base.Load();
+        }
+
+        private Vector2 GetCenter()
+        {
+            var vp = MuGame.Instance.GraphicsDevice.Viewport;
+            return new Vector2(BaseRadius + 40, vp.Height - BaseRadius - 50);
         }
 
         public override void Update(GameTime gameTime)
@@ -68,7 +70,7 @@ namespace Client.Main.Controls.UI.Android
                         Release();
                         break;
                     }
-                    var delta = pos - _defaultCenter;
+                    var delta = pos - GetCenter();
                     float dist = delta.Length();
                     if (dist > MaxKnobOffset)
                         delta = delta / dist * MaxKnobOffset;
@@ -129,7 +131,7 @@ namespace Client.Main.Controls.UI.Android
                 Vector2.Zero,
                 new Vector2(Constants.TERRAIN_SIZE - 1, Constants.TERRAIN_SIZE - 1));
 
-            hero.MoveTo(targetTile, sendToServer: true, usePathfinding: false);
+            hero.MoveTo(targetTile, sendToServer: false, usePathfinding: false);
         }
 
         private void Release()
@@ -145,7 +147,7 @@ namespace Client.Main.Controls.UI.Android
             if (!Visible || _ringTex == null || _circleTex == null) return;
 
             var sb = GraphicsManager.Instance.Sprite;
-            Vector2 drawCenter = _defaultCenter;
+            Vector2 drawCenter = GetCenter();
 
             using (new SpriteBatchScope(sb, SpriteSortMode.Deferred, BlendState.NonPremultiplied,
                 SamplerState.LinearClamp, DepthStencilState.None))
