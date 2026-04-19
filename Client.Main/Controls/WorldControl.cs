@@ -254,18 +254,27 @@ namespace Client.Main.Controls
                 StepLogger.Log($"WorldControl.Load: OBJ instances={objectsToLoad.Count}");
             }
 
-            // Phase 3: sequential load with real per-object progress (25% → 90%)
+            // Phase 3: batched parallel load with per-batch progress (25% → 90%)
             int total = objectsToLoad.Count;
+            const int BatchSize = 48;
             LoadProgress?.Invoke("Loading map objects...", 0.25f);
-            StepLogger.Log($"WorldControl.Load: loading {total} objects sequentially");
+            StepLogger.Log($"WorldControl.Load: loading {total} objects in batches of {BatchSize}");
 
-            for (int i = 0; i < total; i++)
+            for (int i = 0; i < total; i += BatchSize)
             {
-                try { await objectsToLoad[i].Load(); }
-                catch (Exception ex) { StepLogger.Log($"WorldControl.Load: FAULT: {ex.GetBaseException()?.Message}"); }
-
-                if (total > 0)
-                    LoadProgress?.Invoke("Loading map objects...", 0.25f + 0.65f * ((float)(i + 1) / total));
+                int end = Math.Min(i + BatchSize, total);
+                var batchTasks = new Task[end - i];
+                for (int j = i; j < end; j++)
+                {
+                    var obj = objectsToLoad[j];
+                    batchTasks[j - i] = obj.Load().ContinueWith(t =>
+                    {
+                        if (t.IsFaulted)
+                            StepLogger.Log($"WorldControl.Load: FAULT: {t.Exception?.GetBaseException()?.Message}");
+                    }, TaskContinuationOptions.ExecuteSynchronously);
+                }
+                await Task.WhenAll(batchTasks);
+                LoadProgress?.Invoke("Loading map objects...", 0.25f + 0.65f * ((float)end / total));
             }
             StepLogger.Log("WorldControl.Load: object loading done");
 
