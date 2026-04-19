@@ -125,19 +125,26 @@ namespace Client.Main.Controls.UI.Android
             if (MuGame.Instance.ActiveScene is not Scenes.GameScene gs) return;
             var hero = gs.Hero;
             if (hero == null || hero.IsDead) return;
-            if (gs.World is not WalkableWorldControl) return;
+            if (gs.World is not WalkableWorldControl world) return;
 
             var iso = new Vector2(
                 Direction.X + Direction.Y,
                 Direction.X - Direction.Y);
 
-            var raw = hero.Location + iso * 6f;
-            // BuildDirectPath requires integer coordinates to avoid infinite loop
-            var targetTile = new Vector2(
-                Math.Clamp((float)Math.Round(raw.X), 0, Constants.TERRAIN_SIZE - 1),
-                Math.Clamp((float)Math.Round(raw.Y), 0, Constants.TERRAIN_SIZE - 1));
+            // Try step sizes from 6 down to 1, respecting terrain walkability
+            for (int step = 6; step >= 1; step--)
+            {
+                var raw = hero.Location + iso * step;
+                var tile = new Vector2(
+                    Math.Clamp((float)Math.Round(raw.X), 0, Constants.TERRAIN_SIZE - 1),
+                    Math.Clamp((float)Math.Round(raw.Y), 0, Constants.TERRAIN_SIZE - 1));
 
-            hero.MoveTo(targetTile, sendToServer: false, usePathfinding: false);
+                if (world.IsWalkable(tile))
+                {
+                    hero.MoveTo(tile, sendToServer: false, usePathfinding: false);
+                    return;
+                }
+            }
         }
 
         private void Release()

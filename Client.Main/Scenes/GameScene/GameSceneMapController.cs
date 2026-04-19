@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using System.Diagnostics.CodeAnalysis;
 using Client.Main.Controls;
 using Client.Main.Controls.UI;
+using Client.Main.Controls.UI.Android;
 using Client.Main.Controls.UI.Game;
 using Client.Main.Controls.UI.Game.Map;
 using Client.Main.Models;
@@ -157,7 +158,8 @@ namespace Client.Main.Scenes
             {
                 _progressBar.Visible = false;
             }
-            _main.Visible = true;
+            if (!OperatingSystem.IsAndroid() && !OperatingSystem.IsIOS())
+                _main.Visible = true;
             _isChangingWorld = false;
 
             UpdateMapName();
@@ -178,11 +180,19 @@ namespace Client.Main.Scenes
             _currentMapNameControl = new MapNameControl { LabelText = _scene.World.Name };
             _scene.Controls.Add(_currentMapNameControl);
             _currentMapNameControl.BringToFront();
-            _chatLog?.BringToFront();
-            _chatInput?.BringToFront();
-            _mapListControl?.BringToFront();
-            _debugPanel?.BringToFront();
-            _cursor?.BringToFront();
+            bool isMobileMap = OperatingSystem.IsAndroid() || OperatingSystem.IsIOS();
+            if (!isMobileMap)
+            {
+                _chatLog?.BringToFront();
+                _chatInput?.BringToFront();
+                _mapListControl?.BringToFront();
+                _debugPanel?.BringToFront();
+                _cursor?.BringToFront();
+            }
+            else
+            {
+                Controls.UI.Android.AndroidHUD.Current?.BringToFront();
+            }
         }
     }
 }
