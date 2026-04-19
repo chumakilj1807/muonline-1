@@ -66,7 +66,11 @@
     build passes (e.g. pass 2 of multi-pass scripts), causing overrides to be skipped.
   -->
   <PropertyGroup>
+    <!-- Always: compile overrides (javac, llc, ILLink bypass, RunContentBuilder bypass) -->
     <AfterMicrosoftNETSdkTargets>$(AfterMicrosoftNETSdkTargets);$(MSBuildThisFileDirectory)MuAndroid.Overrides.targets</AfterMicrosoftNETSdkTargets>
+    <!-- Local dev only: packaging overrides (aapt2, linker) that crash with ACCESS_VIOLATION.
+         On CI (GITHUB_ACTIONS=true) the standard SDK C# tasks handle packaging correctly. -->
+    <AfterMicrosoftNETSdkTargets Condition="'$(GITHUB_ACTIONS)' != 'true'">$(AfterMicrosoftNETSdkTargets);$(MSBuildThisFileDirectory)MuAndroid.LocalDev.targets</AfterMicrosoftNETSdkTargets>
   </PropertyGroup>
 
 </Project>

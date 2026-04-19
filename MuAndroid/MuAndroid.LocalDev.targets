@@ -1,0 +1,94 @@
+<Project>
+  <!--
+    Local-dev-only overrides: bypass C# tasks that crash with ACCESS_VIOLATION
+    when Process.Start() is called from MSBuild on this machine.
+    NOT imported on CI (GITHUB_ACTIONS=true) — the standard SDK C# tasks work fine there.
+
+    Targets overridden here:
+      - _ManifestMerger           (ManifestMerger C# task → simple file copy)
+      - _CompileResources         (Aapt2Compile C# task → Exec aapt2 compile)
+      - _CreateBaseApkWithAapt2   (Aapt2Link C# task → Exec aapt2 link)
+      - _CreateApplicationSharedLibraries (LinkApplicationSharedLibraries → Exec link_so.ps1)
+  -->
+
+  <!-- _ManifestMerger: simple file copy, no java.exe spawn needed -->
+  <Target Name="_ManifestMerger"
+      Inputs="$(IntermediateOutputPath)AndroidManifest.xml;@(ExtractedManifestDocuments);$(_AndroidBuildPropertiesCache);@(_AndroidMSBuildAllProjects)"
+      Outputs="$(IntermediateOutputPath)android\AndroidManifest.xml">
+    <MakeDir Directories="$(IntermediateOutputPath)android" />
+    <Copy
+      SourceFiles="$(IntermediateOutputPath)AndroidManifest.xml"
+      DestinationFiles="$(IntermediateOutputPath)android\AndroidManifest.xml"
+      Condition="Exists('$(IntermediateOutputPath)AndroidManifest.xml')" />
+    <ItemGroup>
+      <FileWrites Include="$(IntermediateOutputPath)android\AndroidManifest.xml" />
+    </ItemGroup>
+  </Target>
+
+  <!-- _CompileResources: Exec aapt2 compile instead of Aapt2Compile C# task -->
+  <Target Name="_CompileResources"
+      DependsOnTargets="$(_BeforeCompileResources);_ConvertResourcesCases;_CalculateResourceFileName">
+    <MakeDir Directories="$(IntermediateOutputPath)flat" Condition="!Exists('$(IntermediateOutputPath)flat')" />
+    <PropertyGroup>
+      <_ResDir>$(MonoAndroidResDirIntermediate.TrimEnd('\'))</_ResDir>
+      <_FlatDir>$(IntermediateOutputPath)flat</_FlatDir>
+      <_Aapt2Exe>$(Aapt2ToolPath)aapt2.exe</_Aapt2Exe>
+    </PropertyGroup>
+    <Exec Command="&quot;$(_Aapt2Exe)&quot; compile --dir &quot;$(_ResDir)&quot; -o &quot;$(_FlatDir)&quot;"
+        WorkingDirectory="$(MSBuildProjectDirectory)"
+        IgnoreStandardErrorWarningFormat="true"
+        Condition="!Exists('$(_FlatDir)\values_strings.arsc.flat')" />
+    <ItemGroup>
+      <FileWrites Include="$(IntermediateOutputPath)flat\*.flat" />
+    </ItemGroup>
+  </Target>
+
+  <!-- _CreateBaseApkWithAapt2: Exec aapt2 link instead of Aapt2Link C# task -->
+  <Target Name="_CreateBaseApkWithAapt2"
+      Inputs="$(IntermediateOutputPath)android\AndroidManifest.xml;@(_FlatFilesForApk)"
+      Outputs="$(_PackagedResources)">
+    <ItemGroup>
+      <_FlatFilesForApk Include="$(IntermediateOutputPath)flat\*.flat" />
+    </ItemGroup>
+    <PropertyGroup>
+      <_PlatformJarApk>$(JavaPlatformJarPath.TrimEnd('\'))</_PlatformJarApk>
+      <_Aapt2ExeApk>$(Aapt2ToolPath)aapt2.exe</_Aapt2ExeApk>
+      <_FlatListFile>$(IntermediateOutputPath)flat_list_apk.txt</_FlatListFile>
+      <_ManifestApk>$(IntermediateOutputPath)android\AndroidManifest.xml</_ManifestApk>
+    </PropertyGroup>
+    <MakeDir Directories="$(IntermediateOutputPath)android\bin" Condition="!Exists('$(IntermediateOutputPath)android\bin')" />
+    <WriteLinesToFile File="$(_FlatListFile)" Lines="@(_FlatFilesForApk)"
+        Overwrite="true" Encoding="ASCII" Condition="!Exists('$(_PackagedResources)')" />
+    <Message Text="_CreateBaseApkWithAapt2: skipped (packaged_resources exists)" Importance="High"
+        Condition="Exists('$(_PackagedResources)')" />
+    <Exec Command="&quot;$(_Aapt2ExeApk)&quot; link --manifest &quot;$(_ManifestApk)&quot; -I &quot;$(_PlatformJarApk)&quot; -o &quot;$(_PackagedResources)&quot; --min-sdk-version 29 --target-sdk-version 36 --no-version-vectors @&quot;$(_FlatListFile)&quot;"
+        WorkingDirectory="$(MSBuildProjectDirectory)"
+        IgnoreStandardErrorWarningFormat="true"
+        Condition="!Exists('$(_PackagedResources)')" />
+    <ItemGroup>
+      <FileWrites Include="$(_PackagedResources)" />
+      <FileWrites Include="$(_FlatListFile)" />
+    </ItemGroup>
+  </Target>
+
+  <!--
+    _CreateApplicationSharedLibraries: run link_so.ps1 when .so missing.
+    On CI the SDK's LinkApplicationSharedLibraries C# task runs instead.
+  -->
+  <Target Name="_CreateApplicationSharedLibraries"
+      DependsOnTargets="_CompileNativeAssemblySources;_PrepareApplicationSharedLibraryItems"
+      Condition=" '$(_AndroidEnableNativeRuntimeLinking)' != 'true' ">
+    <Message Text="_CreateApplicationSharedLibraries: using pre-built libxamarin-app.so" Importance="High"
+        Condition="Exists('$(IntermediateOutputPath)app_shared_libraries\arm64-v8a\libxamarin-app.so')" />
+    <Exec Command="powershell.exe -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)link_so.ps1&quot; &quot;$(IntermediateOutputPath.TrimEnd('\'))&quot;"
+        WorkingDirectory="$(MSBuildProjectDirectory)"
+        IgnoreStandardErrorWarningFormat="true"
+        Condition="!Exists('$(IntermediateOutputPath)app_shared_libraries\arm64-v8a\libxamarin-app.so')" />
+    <Error Text="libxamarin-app.so not found after link_so.ps1"
+        Condition="!Exists('$(IntermediateOutputPath)app_shared_libraries\arm64-v8a\libxamarin-app.so')" />
+    <ItemGroup>
+      <FileWrites Include="@(_ApplicationSharedLibrary)" />
+    </ItemGroup>
+  </Target>
+
+</Project>

@@ -1,105 +1,89 @@
 <Project>
   <!--
-    This file is appended to AfterMicrosoftNETSdkTargets from Directory.Build.targets.
-    It is imported AFTER Microsoft.Android.Sdk.After.targets (and therefore after
-    Microsoft.Android.Sdk.Tooling.targets which defines _ResolveAndroidTooling).
-    All target definitions here WIN over SDK definitions.
+    Overrides imported on BOTH CI and local dev (via AfterMicrosoftNETSdkTargets).
+    Contains only overrides that are safe everywhere:
+      - RunContentBuilder: skip mgcb (XNBs pre-built)
+      - ILLink: skip trimmer (crashes on local dev, not needed for dev/CI)
+      - _CompileJava: use Exec javac (dynamic JDK path, works on both)
+      - _CompileNativeAssemblySources: use Exec llc (dynamic path, works on both)
+      - _ResolveAndroidTooling: pre-set tool properties (skip process-spawning tasks)
+      - _UpdateAndroidResgenAapt2: skip designer-only step
 
-    Workaround for ACCESS_VIOLATION when MSBuild spawns child processes via Process.Start()
-    on some machines (local dev). On CI these tasks also fail due to missing tool paths,
-    so we use Exec with dynamic path resolution instead.
-
-    Dynamic path resolution priority:
-      JDK:         JavaSdkDirectory MSBuild prop → JAVA_HOME_17_X64 → JAVA_HOME → local fallback
-      Android SDK: AndroidSdkDirectory MSBuild prop → ANDROID_SDK_ROOT → ANDROID_HOME → local fallback
-      .NET packs:  DOTNET_ROOT env → local fallback (C:\Program Files\dotnet\packs)
+    Packaging overrides (_CompileResources, _CreateBaseApkWithAapt2,
+    _ManifestMerger, _CreateApplicationSharedLibraries) are in
+    MuAndroid.LocalDev.targets — imported ONLY on local dev (GITHUB_ACTIONS != true).
+    On CI, the standard SDK C# tasks handle packaging correctly.
   -->
 
-  <!-- === Step 1: resolve base directories === -->
+  <!-- === Dynamic path resolution === -->
   <PropertyGroup>
-    <!-- JDK home -->
     <_JdkHome Condition="'$(JavaSdkDirectory)' != ''">$(JavaSdkDirectory)</_JdkHome>
     <_JdkHome Condition="'$(_JdkHome)' == '' And '$(JAVA_HOME_17_X64)' != ''">$(JAVA_HOME_17_X64)</_JdkHome>
     <_JdkHome Condition="'$(_JdkHome)' == '' And '$(JAVA_HOME)' != ''">$(JAVA_HOME)</_JdkHome>
     <_JdkHome Condition="'$(_JdkHome)' == ''">C:\Program Files\Eclipse Adoptium\jdk-17.0.18.8-hotspot</_JdkHome>
 
-    <!-- Android SDK root -->
     <_AndroidSdkRoot Condition="'$(AndroidSdkDirectory)' != ''">$(AndroidSdkDirectory)</_AndroidSdkRoot>
     <_AndroidSdkRoot Condition="'$(_AndroidSdkRoot)' == '' And '$(ANDROID_SDK_ROOT)' != ''">$(ANDROID_SDK_ROOT)</_AndroidSdkRoot>
     <_AndroidSdkRoot Condition="'$(_AndroidSdkRoot)' == '' And '$(ANDROID_HOME)' != ''">$(ANDROID_HOME)</_AndroidSdkRoot>
     <_AndroidSdkRoot Condition="'$(_AndroidSdkRoot)' == ''">C:\Android\Sdk</_AndroidSdkRoot>
 
-    <!-- .NET packs directory -->
     <_DotNetPacksDir Condition="'$(DOTNET_ROOT)' != ''">$(DOTNET_ROOT)\packs</_DotNetPacksDir>
     <_DotNetPacksDir Condition="'$(_DotNetPacksDir)' == ''">C:\Program Files\dotnet\packs</_DotNetPacksDir>
 
-    <!-- Derived: .NET Android pack dirs (version 36.1.53) -->
     <_AndroidSdkPackDir>$(_DotNetPacksDir)\Microsoft.Android.Sdk.Windows\36.1.53</_AndroidSdkPackDir>
     <_AndroidRefPackDir>$(_DotNetPacksDir)\Microsoft.Android.Ref.36\36.1.53</_AndroidRefPackDir>
   </PropertyGroup>
 
-  <!-- === Step 2: tool properties (use dynamic dirs) === -->
   <PropertyGroup>
-    <!-- Java SDK 17 — output of ValidateJavaVersion task -->
     <_JdkVersion>17.0.18</_JdkVersion>
     <_DefaultJdkVersion>17</_DefaultJdkVersion>
-
-    <!-- Android API level -->
     <_AndroidApiLevel Condition="'$(_AndroidApiLevel)' == ''">36</_AndroidApiLevel>
     <_AndroidApiLevelName>Android 16</_AndroidApiLevelName>
 
-    <!-- Build tools -->
     <AndroidSdkBuildToolsVersion Condition="'$(AndroidSdkBuildToolsVersion)' == ''">35.0.0</AndroidSdkBuildToolsVersion>
     <AndroidSdkBuildToolsPath Condition="'$(AndroidSdkBuildToolsPath)' == ''">$(_AndroidSdkRoot)\build-tools\35.0.0\</AndroidSdkBuildToolsPath>
     <AndroidSdkBuildToolsBinPath Condition="'$(AndroidSdkBuildToolsBinPath)' == ''">$(_AndroidSdkRoot)\build-tools\35.0.0\</AndroidSdkBuildToolsBinPath>
 
-    <!-- aapt2: bundled in .NET Android SDK pack -->
     <Aapt2ToolPath Condition="'$(Aapt2ToolPath)' == ''">$(_AndroidSdkPackDir)\tools\</Aapt2ToolPath>
     <_Aapt2Version>2.20-13193326</_Aapt2Version>
 
-    <!-- zipalign -->
     <ZipAlignToolPath Condition="'$(ZipAlignToolPath)' == ''">$(_AndroidSdkRoot)\build-tools\35.0.0\</ZipAlignToolPath>
-
-    <!-- apksigner -->
     <ApkSignerJar Condition="'$(ApkSignerJar)' == ''">$(_AndroidSdkRoot)\build-tools\35.0.0\lib\apksigner.jar</ApkSignerJar>
     <AndroidUseApkSigner Condition="'$(AndroidUseApkSigner)' == ''">true</AndroidUseApkSigner>
 
-    <!-- sequence points -->
     <_SequencePointsMode Condition="'$(_SequencePointsMode)' == ''">None</_SequencePointsMode>
 
-    <!--
-      JavaPlatformJarPath: prefer android-36, fall back to android-35 for compilation.
-      Both are API-compatible for stub generation.
-    -->
     <_Android36Jar>$(_AndroidSdkRoot)\platforms\android-36\android.jar</_Android36Jar>
     <_Android35Jar>$(_AndroidSdkRoot)\platforms\android-35\android.jar</_Android35Jar>
     <JavaPlatformJarPath Condition="'$(JavaPlatformJarPath)' == '' And Exists('$(_Android36Jar)')">$(_Android36Jar)</JavaPlatformJarPath>
     <JavaPlatformJarPath Condition="'$(JavaPlatformJarPath)' == ''">$(_Android35Jar)</JavaPlatformJarPath>
 
-    <!-- Disable ILLink: dotnet.exe spawn crashes via TaskHostFactory on this machine -->
     <RunILLink>false</RunILLink>
     <PublishTrimmed>false</PublishTrimmed>
-
-    <!-- ABIs: arm64-v8a + x86_64 (.NET 10 default RID set) -->
     <AndroidSupportedAbis Condition="'$(AndroidSupportedAbis)' == ''">arm64-v8a;x86_64</AndroidSupportedAbis>
   </PropertyGroup>
 
   <!-- ILLink bypass -->
   <Target Name="_RunILLink">
-    <Message Text="_RunILLink: skipped (ILLink bypassed — dotnet.exe spawn crashes on this machine)" Importance="High" />
+    <Message Text="_RunILLink: skipped (ILLink bypassed)" Importance="High" />
   </Target>
   <Target Name="ILLink" DependsOnTargets="_RunILLink">
     <Message Text="ILLink: skipped (bypassed, assemblies untrimmed)" Importance="High" />
   </Target>
 
-  <!-- Content builder bypass (XNBs pre-built) -->
+  <!-- Content builder bypass -->
   <Target Name="RunContentBuilder" DependsOnTargets="PrepareContentBuilder">
-    <Message Text="RunContentBuilder: skipped (content pre-built as .xnb, mgcb bypassed)" Importance="High" />
+    <Message Text="RunContentBuilder: skipped (content pre-built as .xnb)" Importance="High" />
+  </Target>
+
+  <!-- Designer-only step: skip -->
+  <Target Name="_UpdateAndroidResgenAapt2">
+    <Message Text="_UpdateAndroidResgenAapt2: skipped (designer-only)" Importance="High" />
   </Target>
 
   <!--
-    Override _CompileJava: bypass Javac C# task (crashes with ACCESS_VIOLATION).
-    Uses Exec → javac.exe directly. JDK path resolved from JavaSdkDirectory / JAVA_HOME.
+    _CompileJava: bypass Javac C# task via Exec javac.
+    Works on both CI and local dev (JDK path resolved dynamically).
   -->
   <Target Name="_CompileJava"
       DependsOnTargets="$(_CompileJavaDependsOnTargets);_CollectJavaSource"
@@ -110,10 +94,8 @@
 
     <PropertyGroup>
       <_JavacExePath>$(_JdkHome)\bin\javac.exe</_JavacExePath>
-      <_JarExePath>$(_JdkHome)\bin\jar.exe</_JarExePath>
       <_AndroidToolsDir>$(_AndroidSdkPackDir)\tools</_AndroidToolsDir>
       <_MonoAndroidJar>$(_AndroidRefPackDir)\ref\net10.0\mono.android.jar</_MonoAndroidJar>
-      <!-- Use JavaPlatformJarPath (already resolved above) instead of hardcoded path -->
       <_JavacCp>$(JavaPlatformJarPath);$(_AndroidToolsDir)\java_runtime_clr.jar;$(_AndroidToolsDir)\java-interop.jar;$(_MonoAndroidJar)</_JavacCp>
       <_JavaSrcDir>$(_AndroidIntermediateJavaSourceDirectory.TrimEnd('\'))</_JavaSrcDir>
       <_JavaClassDir>$(_AndroidIntermediateJavaClassDirectory.TrimEnd('\'))</_JavaClassDir>
@@ -124,11 +106,7 @@
       <_JavaSourceFiles2 Include="$(_JavaSrcDir)\**\*.java" />
     </ItemGroup>
 
-    <WriteLinesToFile
-        File="$(_JavaRspFile)"
-        Lines="@(_JavaSourceFiles2)"
-        Overwrite="true"
-        Encoding="ASCII" />
+    <WriteLinesToFile File="$(_JavaRspFile)" Lines="@(_JavaSourceFiles2)" Overwrite="true" Encoding="ASCII" />
 
     <PropertyGroup>
       <_ClassesZipPath>$(IntermediateOutputPath)android\bin\classes.zip</_ClassesZipPath>
@@ -136,7 +114,7 @@
       <_ClassesZipExists Condition="'$(_ClassesZipExists)' == ''">false</_ClassesZipExists>
     </PropertyGroup>
 
-    <Message Text="_CompileJava: classes.zip already exists — skipping javac+zip" Importance="High"
+    <Message Text="_CompileJava: classes.zip already exists — skipping javac" Importance="High"
         Condition="'$(_ClassesZipExists)' == 'true'" />
 
     <Exec Command="&quot;$(_JavacExePath)&quot; -source 11 -target 11 -encoding UTF-8 -cp &quot;$(_JavacCp)&quot; -d &quot;$(_JavaClassDir)&quot; @&quot;$(_JavaRspFile)&quot;"
@@ -144,11 +122,8 @@
         IgnoreStandardErrorWarningFormat="true"
         Condition="'$(_ClassesZipExists)' != 'true' And '@(_JavaSourceFiles2)' != ''" />
 
-    <ZipDirectory
-        SourceDirectory="$(_JavaClassDir)"
-        DestinationFile="$(_ClassesZipPath)"
-        Overwrite="true"
-        Condition="'$(_ClassesZipExists)' != 'true'" />
+    <ZipDirectory SourceDirectory="$(_JavaClassDir)" DestinationFile="$(_ClassesZipPath)"
+        Overwrite="true" Condition="'$(_ClassesZipExists)' != 'true'" />
 
     <Touch Files="$(_AndroidCompileJavaStampFile)" AlwaysCreate="true" />
     <ItemGroup>
@@ -159,84 +134,8 @@
   </Target>
 
   <!--
-    Override _CompileResources: bypass Aapt2Compile C# task.
-    aapt2 path resolved from .NET Android SDK pack.
-  -->
-  <Target Name="_CompileResources"
-      DependsOnTargets="$(_BeforeCompileResources);_ConvertResourcesCases;_CalculateResourceFileName">
-    <MakeDir Directories="$(IntermediateOutputPath)flat" Condition="!Exists('$(IntermediateOutputPath)flat')" />
-    <PropertyGroup>
-      <_ResDir>$(MonoAndroidResDirIntermediate.TrimEnd('\'))</_ResDir>
-      <_FlatDir>$(IntermediateOutputPath)flat</_FlatDir>
-      <_Aapt2Exe>$(Aapt2ToolPath)aapt2.exe</_Aapt2Exe>
-    </PropertyGroup>
-    <Exec Command="&quot;$(_Aapt2Exe)&quot; compile --dir &quot;$(_ResDir)&quot; -o &quot;$(_FlatDir)&quot;"
-        WorkingDirectory="$(MSBuildProjectDirectory)"
-        IgnoreStandardErrorWarningFormat="true"
-        Condition="!Exists('$(_FlatDir)\values_strings.arsc.flat')" />
-    <ItemGroup>
-      <FileWrites Include="$(IntermediateOutputPath)flat\*.flat" />
-    </ItemGroup>
-  </Target>
-
-  <!-- Override _UpdateAndroidResgenAapt2: no-op for Release builds -->
-  <Target Name="_UpdateAndroidResgenAapt2">
-    <Message Text="_UpdateAndroidResgenAapt2: skipped (designer-only, not needed for Release APK)" Importance="High" />
-  </Target>
-
-  <!--
-    Override _CreateBaseApkWithAapt2: bypass Aapt2Link C# task.
-    aapt2 path resolved from .NET Android SDK pack.
-  -->
-  <Target Name="_CreateBaseApkWithAapt2"
-      Inputs="$(IntermediateOutputPath)android\AndroidManifest.xml;@(_FlatFilesForApk)"
-      Outputs="$(_PackagedResources)">
-    <ItemGroup>
-      <_FlatFilesForApk Include="$(IntermediateOutputPath)flat\*.flat" />
-    </ItemGroup>
-    <PropertyGroup>
-      <_BaseApkOutputDir>$(IntermediateOutputPath)android\bin</_BaseApkOutputDir>
-      <_PlatformJarApk>$(JavaPlatformJarPath.TrimEnd('\'))</_PlatformJarApk>
-      <_Aapt2ExeApk>$(Aapt2ToolPath)aapt2.exe</_Aapt2ExeApk>
-      <_FlatListFile>$(IntermediateOutputPath)flat_list_apk.txt</_FlatListFile>
-      <_ManifestApk>$(IntermediateOutputPath)android\AndroidManifest.xml</_ManifestApk>
-    </PropertyGroup>
-    <MakeDir Directories="$(_BaseApkOutputDir)" Condition="!Exists('$(_BaseApkOutputDir)')" />
-    <WriteLinesToFile
-        File="$(_FlatListFile)"
-        Lines="@(_FlatFilesForApk)"
-        Overwrite="true"
-        Encoding="ASCII"
-        Condition="!Exists('$(_PackagedResources)')" />
-    <Message Text="_CreateBaseApkWithAapt2: skipped (packaged_resources already exists)" Importance="High"
-        Condition="Exists('$(_PackagedResources)')" />
-    <Exec Command="&quot;$(_Aapt2ExeApk)&quot; link --manifest &quot;$(_ManifestApk)&quot; -I &quot;$(_PlatformJarApk)&quot; -o &quot;$(_PackagedResources)&quot; --min-sdk-version 29 --target-sdk-version 36 --no-version-vectors @&quot;$(_FlatListFile)&quot;"
-        WorkingDirectory="$(MSBuildProjectDirectory)"
-        IgnoreStandardErrorWarningFormat="true"
-        Condition="!Exists('$(_PackagedResources)')" />
-    <ItemGroup>
-      <FileWrites Include="$(_PackagedResources)" />
-      <FileWrites Include="$(_FlatListFile)" />
-    </ItemGroup>
-  </Target>
-
-  <!-- Override _ManifestMerger: simple file copy (no AAR library manifests to merge) -->
-  <Target Name="_ManifestMerger"
-      Inputs="$(IntermediateOutputPath)AndroidManifest.xml;@(ExtractedManifestDocuments);$(_AndroidBuildPropertiesCache);@(_AndroidMSBuildAllProjects)"
-      Outputs="$(IntermediateOutputPath)android\AndroidManifest.xml">
-    <MakeDir Directories="$(IntermediateOutputPath)android" />
-    <Copy
-      SourceFiles="$(IntermediateOutputPath)AndroidManifest.xml"
-      DestinationFiles="$(IntermediateOutputPath)android\AndroidManifest.xml"
-      Condition="Exists('$(IntermediateOutputPath)AndroidManifest.xml')" />
-    <ItemGroup>
-      <FileWrites Include="$(IntermediateOutputPath)android\AndroidManifest.xml" />
-    </ItemGroup>
-  </Target>
-
-  <!--
-    Override _CompileNativeAssemblySources: bypass CompileNativeAssembly C# task.
-    llc.exe path resolved from .NET Android SDK pack.
+    _CompileNativeAssemblySources: bypass CompileNativeAssembly C# task via Exec llc.
+    Works on both CI and local dev.
   -->
   <Target Name="_CompileNativeAssemblySources"
       DependsOnTargets="_PrepareNativeAssemblyItems;_GenerateCompressedAssembliesNativeSourceFiles"
@@ -253,7 +152,6 @@
     <PropertyGroup>
       <_LlcExePath>$(_AndroidSdkPackDir)\tools\binutils\bin\llc.exe</_LlcExePath>
     </PropertyGroup>
-    <!-- Call llc.exe via compile_ll.bat — skip if .o already exists -->
     <Exec
         Command="&quot;$(MSBuildThisFileDirectory)compile_ll.bat&quot; &quot;%(_AllLlSources2.Identity)&quot; &quot;$(_LlcExePath)&quot; 29"
         WorkingDirectory="$(MSBuildProjectDirectory)"
@@ -264,29 +162,7 @@
     </ItemGroup>
   </Target>
 
-  <!--
-    Override _CreateApplicationSharedLibraries: bypass LinkApplicationSharedLibraries C# task.
-    If libxamarin-app.so is missing (first build or CI), run link_so.ps1 with dynamic paths.
-    link_so.ps1 reads DOTNET_ROOT env var to locate ld.exe and runtime libs.
-  -->
-  <Target Name="_CreateApplicationSharedLibraries"
-      DependsOnTargets="_CompileNativeAssemblySources;_PrepareApplicationSharedLibraryItems"
-      Condition=" '$(_AndroidEnableNativeRuntimeLinking)' != 'true' ">
-    <Message Text="_CreateApplicationSharedLibraries: using pre-built libxamarin-app.so" Importance="High"
-        Condition="Exists('$(IntermediateOutputPath)app_shared_libraries\arm64-v8a\libxamarin-app.so')" />
-    <!-- Run linker when .so is missing (CI or fresh checkout) -->
-    <Exec Command="powershell.exe -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)link_so.ps1&quot; &quot;$(IntermediateOutputPath.TrimEnd('\'))&quot;"
-        WorkingDirectory="$(MSBuildProjectDirectory)"
-        IgnoreStandardErrorWarningFormat="true"
-        Condition="!Exists('$(IntermediateOutputPath)app_shared_libraries\arm64-v8a\libxamarin-app.so')" />
-    <Error Text="libxamarin-app.so still not found after link_so.ps1 — check output above"
-        Condition="!Exists('$(IntermediateOutputPath)app_shared_libraries\arm64-v8a\libxamarin-app.so')" />
-    <ItemGroup>
-      <FileWrites Include="@(_ApplicationSharedLibrary)" />
-    </ItemGroup>
-  </Target>
-
-  <!-- Override _ResolveAndroidTooling: all outputs pre-set above; skip tasks that crash -->
+  <!-- _ResolveAndroidTooling: pre-set properties, skip process-spawning tasks -->
   <Target Name="_ResolveAndroidTooling">
     <PropertyGroup>
       <_AndroidUseJavaExeVersion Condition=" '$(_AndroidUseJavaExeVersion)' == '' ">false</_AndroidUseJavaExeVersion>
