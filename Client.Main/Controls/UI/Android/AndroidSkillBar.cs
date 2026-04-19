@@ -91,6 +91,7 @@ namespace Client.Main.Controls.UI.Android
 
             if (skillType == SkillType.Area)
             {
+                // Show area target ring; skill fires when user confirms location
                 if (_areaSelector == null) return;
                 HeroObject hero = null;
                 if (MuGame.Instance.ActiveScene is Scenes.GameScene gs)
@@ -98,9 +99,15 @@ namespace Client.Main.Controls.UI.Android
                 if (hero != null)
                     _areaSelector.Activate(skill, hero.Location);
             }
+            else if (skillType == SkillType.Target)
+            {
+                // Fire once at nearest visible monster
+                AndroidHUD.Current?.InvokeDirectSkill(skill);
+            }
             else
             {
-                AndroidHUD.Current?.InvokeDirectSkill(skill);
+                // Self skill — fire once, no target needed
+                AndroidHUD.Current?.InvokeSelfSkill(skill);
             }
         }
 

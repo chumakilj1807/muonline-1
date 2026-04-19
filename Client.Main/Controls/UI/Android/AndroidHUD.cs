@@ -180,6 +180,12 @@ namespace Client.Main.Controls.UI.Android
             _skillController.AndroidUseSkillOnNearestTarget(skill);
         }
 
+        public void InvokeSelfSkill(SkillEntryState skill)
+        {
+            if (_skillController == null) return;
+            _skillController.AndroidUseSelfSkill(skill);
+        }
+
         public override void Dispose()
         {
             if (Current == this) Current = null;

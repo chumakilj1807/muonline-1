@@ -47,7 +47,7 @@ namespace Client.Main.Controls.UI.Android
         private Vector2 GetCenter()
         {
             var vp = MuGame.Instance.GraphicsDevice.Viewport;
-            return new Vector2(BaseRadius + 40, vp.Height - BaseRadius - 50);
+            return new Vector2(BaseRadius + 80, vp.Height - BaseRadius - 130);
         }
 
         public override void Update(GameTime gameTime)
@@ -56,7 +56,9 @@ namespace Client.Main.Controls.UI.Android
 
             var touches = MuGame.Instance.Touch;
             var vp = MuGame.Instance.GraphicsDevice.Viewport;
-            float leftBoundary = vp.Width * 0.4f;
+            var center = GetCenter();
+            // Activation zone: circle of radius ActivationRadius around joystick center
+            const float ActivationRadius = 160f;
 
             bool found = false;
             foreach (var touch in touches)
@@ -70,7 +72,7 @@ namespace Client.Main.Controls.UI.Android
                         Release();
                         break;
                     }
-                    var delta = pos - GetCenter();
+                    var delta = pos - center;
                     float dist = delta.Length();
                     if (dist > MaxKnobOffset)
                         delta = delta / dist * MaxKnobOffset;
@@ -82,9 +84,12 @@ namespace Client.Main.Controls.UI.Android
                     break;
                 }
 
+                float tdx = pos.X - center.X;
+                float tdy = pos.Y - center.Y;
+                bool inZone = tdx * tdx + tdy * tdy <= ActivationRadius * ActivationRadius;
                 if (_activeTouchId == -1 &&
                     touch.State == TouchLocationState.Pressed &&
-                    pos.X < leftBoundary && pos.Y > vp.Height * 0.3f)
+                    inZone)
                 {
                     _activeTouchId = touch.Id;
                     // Fixed center — knob moves, base stays
@@ -123,8 +128,8 @@ namespace Client.Main.Controls.UI.Android
             if (gs.World is not WalkableWorldControl) return;
 
             var iso = new Vector2(
-                Direction.X - Direction.Y,
-                Direction.X + Direction.Y);
+                Direction.X + Direction.Y,
+                Direction.X - Direction.Y);
 
             var raw = hero.Location + iso * 6f;
             // BuildDirectPath requires integer coordinates to avoid infinite loop

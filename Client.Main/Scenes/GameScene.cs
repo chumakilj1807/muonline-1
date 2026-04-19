@@ -632,8 +632,8 @@ namespace Client.Main.Scenes
                 if (targetGone) _autoAttackTarget = null;
             }
 
-            // Continuous auto-attack each frame while target is alive
-            if (_autoAttackTarget != null && Hero != null && !Hero.IsDead)
+            // Continuous auto-attack each frame while target is alive (PC only)
+            if (!_isMobile && _autoAttackTarget != null && Hero != null && !Hero.IsDead)
             {
                 if (_autoAttackTarget is MonsterObject autoMonster)
                     Hero.Attack(autoMonster);

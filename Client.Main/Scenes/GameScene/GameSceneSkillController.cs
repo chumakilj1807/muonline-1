@@ -61,6 +61,15 @@ namespace Client.Main.Scenes
         public bool AndroidUseAreaSkill(Core.Client.SkillEntryState skill, Vector2 targetTile)
             => UseAreaSkill(skill, 0, targetTile);
 
+        /// <summary>Self-targeting skill: fires once at hero's own location, no target needed.</summary>
+        public bool AndroidUseSelfSkill(Core.Client.SkillEntryState skill)
+        {
+            var hero = _scene.Hero;
+            if (hero == null || hero.IsDead) return false;
+            if (!TryBeginSkillCast(skill, hero)) return false;
+            return UseAreaSkill(skill, 0, hero.Location);
+        }
+
         /// <summary>Called by Android UI to fire a targeted skill at nearest enemy.</summary>
         public bool AndroidUseSkillOnNearestTarget(Core.Client.SkillEntryState skill)
         {
