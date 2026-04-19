@@ -1,4 +1,5 @@
-﻿using Client.Data.ATT;
+﻿using System.Threading;
+using Client.Data.ATT;
 using Client.Data.CAP;
 using Client.Data.OBJS;
 using Client.Main.Controllers;
@@ -151,6 +152,9 @@ namespace Client.Main.Controls
         public string BackgroundMusicPath { get; set; }
         public string AmbientSoundPath { get; set; }
 
+        /// <summary>Callback for real-time load progress. Args: (message, 0..1).</summary>
+        public Action<string, float> LoadProgress { get; set; }
+
         public TerrainControl Terrain { get; }
 
         public short WorldIndex { get; private set; }
@@ -207,8 +211,12 @@ namespace Client.Main.Controls
         public override async Task Load()
         {
             StepLogger.Log($"WorldControl.Load: start WorldIndex={WorldIndex}");
+
+            // Phase 1: terrain (0% → 20%)
+            LoadProgress?.Invoke("Loading terrain...", 0f);
             await base.Load();
             StepLogger.Log("WorldControl.Load: base.Load done");
+            LoadProgress?.Invoke("Loading terrain...", 0.20f);
 
             CreateMapTileObjects();
             Camera.Instance.AspectRatio = GraphicsDevice.Viewport.AspectRatio;
@@ -217,7 +225,7 @@ namespace Client.Main.Controls
             var dataPath = Constants.DataPath;
             var tasks = new List<Task>();
 
-            // Load camera settings
+            // Phase 2: camera + OBJ parse (20% → 25%)
             var capPath = Path.Combine(dataPath, worldFolder, "Camera_Angle_Position.bmd");
             StepLogger.Log($"WorldControl.Load: CAP exists={File.Exists(capPath)}");
             if (File.Exists(capPath))
@@ -230,7 +238,6 @@ namespace Client.Main.Controls
                 StepLogger.Log("WorldControl.Load: CAP loaded");
             }
 
-            // Load terrain OBJ
             var objPath = Path.Combine(dataPath, worldFolder, $"EncTerrain{WorldIndex}.obj");
             StepLogger.Log($"WorldControl.Load: OBJ exists={File.Exists(objPath)}");
             if (File.Exists(objPath))
@@ -244,35 +251,49 @@ namespace Client.Main.Controls
                     if (instance != null)
                     {
                         var capturedType = instance.GetType().Name;
-                        var capturedMapObj = mapObj;
                         tasks.Add(instance.Load().ContinueWith(t =>
                         {
                             if (t.IsFaulted)
                                 StepLogger.Log($"WorldControl.Load: FAULT in {capturedType}: {t.Exception?.GetBaseException()?.Message}");
                             else
                                 StepLogger.Log($"WorldControl.Load: loaded {capturedType} ok");
-                        }, System.Threading.Tasks.TaskContinuationOptions.ExecuteSynchronously));
+                        }, TaskContinuationOptions.ExecuteSynchronously));
                     }
                 }
                 StepLogger.Log($"WorldControl.Load: OBJ tasks queued={tasks.Count}");
             }
 
-            StepLogger.Log($"WorldControl.Load: awaiting {tasks.Count} object tasks");
-            await Task.WhenAll(tasks);
+            // Phase 3: map objects in parallel (25% → 90%), tracked per-object
+            int total = tasks.Count;
+            int completed = 0;
+            LoadProgress?.Invoke("Loading map objects...", 0.25f);
+
+            if (total > 0)
+            {
+                var tracked = tasks.Select(t => t.ContinueWith(_ =>
+                {
+                    int done = Interlocked.Increment(ref completed);
+                    LoadProgress?.Invoke("Loading map objects...", 0.25f + 0.65f * ((float)done / total));
+                }, TaskContinuationOptions.ExecuteSynchronously)).ToList();
+
+                StepLogger.Log($"WorldControl.Load: awaiting {total} object tasks");
+                await Task.WhenAll(tracked);
+            }
             StepLogger.Log("WorldControl.Load: object tasks done");
 
-            // Play or stop background music
+            // Phase 4: audio (90% → 100%)
+            LoadProgress?.Invoke("Finalizing...", 0.90f);
             if (!string.IsNullOrEmpty(BackgroundMusicPath))
                 SoundController.Instance.PlayBackgroundMusic(BackgroundMusicPath);
             else
                 SoundController.Instance.StopBackgroundMusic();
 
-            // Play or stop ambient sound
             if (!string.IsNullOrEmpty(AmbientSoundPath))
                 SoundController.Instance.PlayAmbientSound(AmbientSoundPath);
             else
                 SoundController.Instance.StopAmbientSound();
 
+            LoadProgress?.Invoke("Done", 1f);
             StepLogger.Log("WorldControl.Load: complete");
         }
 

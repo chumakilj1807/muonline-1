@@ -35,13 +35,13 @@ foreach ($a in $abis) {
 
     New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
-    $oFiles = @(
-        "$obj\typemaps.$abi.o"
-        "$obj\environment.$abi.o"
-        "$obj\compressed_assemblies.$abi.o"
-        "$obj\marshal_methods.$abi.o"
-        "$obj\jni_remap.$abi.o"
-    )
+    $oFiles = Get-ChildItem "$obj\*.$abi.o" -ErrorAction SilentlyContinue |
+              Sort-Object Name |
+              Select-Object -ExpandProperty FullName
+    if ($oFiles.Count -eq 0) {
+        Write-Host "  ERROR: no .o files for $abi in $obj"
+        exit 1
+    }
 
     $staticLibs = @(
         '--whole-archive'

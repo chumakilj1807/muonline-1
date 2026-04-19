@@ -120,15 +120,19 @@ namespace Client.Main.Scenes
             if (nextWorld is WalkableWorldControl walkable)
                 walkable.Walker = _scene.Hero;
 
+            // Wire real-time load progress: WorldControl reports 0..1, we map to 0.05..0.82
+            nextWorld.LoadProgress = (msg, p) =>
+                UpdateLoadProgress(msg, 0.05f + 0.77f * p);
+
             _scene.Controls.Add(nextWorld);
             _scene.SetWorldInternal(nextWorld);
             _scene.World.Objects.Add(_scene.Hero);
 
-            _loadingScreen.Progress = 0.1f;
+            _loadingScreen.Progress = 0.05f;
             _logger?.LogDebug($"GameScene.ChangeMap<{worldType.Name}>: Initializing new world...");
             await nextWorld.Initialize();
             _logger?.LogDebug($"GameScene.ChangeMap<{worldType.Name}>: New world initialized. Status: {nextWorld.Status}");
-            _loadingScreen.Progress = 0.7f;
+            _loadingScreen.Progress = 0.82f;
 
             if (previousWorld != null)
             {
@@ -139,7 +143,7 @@ namespace Client.Main.Scenes
 
             if (_scene.World.Status == GameControlStatus.Ready)
             {
-                _loadingScreen.Progress = 0.8f;
+                _loadingScreen.Progress = 0.85f;
                 _logger?.LogDebug("GameScene.ChangeMap: World is Ready. Importing pending objects...");
                 await (_scopeImportController?.ImportPendingRemotePlayersAsync() ?? Task.CompletedTask);
                 await (_scopeImportController?.ImportPendingNpcsMonstersAsync() ?? Task.CompletedTask);
@@ -149,7 +153,7 @@ namespace Client.Main.Scenes
             {
                 _logger?.LogDebug($"GameScene.ChangeMap: World not ready after Initialize (Status: {_scene.World.Status}). Pending objects may not import correctly.");
             }
-            _loadingScreen.Progress = 0.95f;
+            _loadingScreen.Progress = 0.97f;
 
             await MuGame.Network.SendClientReadyAfterMapChangeAsync();
 
