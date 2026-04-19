@@ -63,6 +63,18 @@
     <AndroidAsset Include="..\Client.Main\appsettings.json">
       <Link>appsettings.json</Link>
     </AndroidAsset>
+    <!-- Pre-built XNBs committed to git (bin/ is gitignored, so we keep them here) -->
+    <AndroidAsset Include="..\Client.Main\MGContent\PrebuiltAndroid\AlphaRGB.xnb"><Link>Content/AlphaRGB.xnb</Link></AndroidAsset>
+    <AndroidAsset Include="..\Client.Main\MGContent\PrebuiltAndroid\Arial.xnb"><Link>Content/Arial.xnb</Link></AndroidAsset>
+    <AndroidAsset Include="..\Client.Main\MGContent\PrebuiltAndroid\Background.xnb"><Link>Content/Background.xnb</Link></AndroidAsset>
+    <AndroidAsset Include="..\Client.Main\MGContent\PrebuiltAndroid\Bubbles.xnb"><Link>Content/Bubbles.xnb</Link></AndroidAsset>
+    <AndroidAsset Include="..\Client.Main\MGContent\PrebuiltAndroid\DynamicLighting.xnb"><Link>Content/DynamicLighting.xnb</Link></AndroidAsset>
+    <AndroidAsset Include="..\Client.Main\MGContent\PrebuiltAndroid\FXAA.xnb"><Link>Content/FXAA.xnb</Link></AndroidAsset>
+    <AndroidAsset Include="..\Client.Main\MGContent\PrebuiltAndroid\ItemMaterial.xnb"><Link>Content/ItemMaterial.xnb</Link></AndroidAsset>
+    <AndroidAsset Include="..\Client.Main\MGContent\PrebuiltAndroid\MonsterMaterial.xnb"><Link>Content/MonsterMaterial.xnb</Link></AndroidAsset>
+    <AndroidAsset Include="..\Client.Main\MGContent\PrebuiltAndroid\NotoKR.xnb"><Link>Content/NotoKR.xnb</Link></AndroidAsset>
+    <AndroidAsset Include="..\Client.Main\MGContent\PrebuiltAndroid\Shadow.xnb"><Link>Content/Shadow.xnb</Link></AndroidAsset>
+    <AndroidAsset Include="..\Client.Main\MGContent\PrebuiltAndroid\WaterSplashParticle.xnb"><Link>Content/WaterSplashParticle.xnb</Link></AndroidAsset>
   </ItemGroup>
 
   <ItemGroup>
