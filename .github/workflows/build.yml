@@ -100,6 +100,7 @@ jobs:
             -p:AndroidSdkDirectory=$env:ANDROID_SDK_ROOT `
             -p:JavaSdkDirectory=$env:JAVA_HOME `
             -p:AcceptAndroidSdkLicenses=true `
+            -p:AndroidPackageFormat=apk `
             -p:RunAOTCompilation=false `
             -p:UseInterpreter=true `
             -p:AndroidKeyStore=true `
