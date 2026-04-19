@@ -13,28 +13,22 @@ using System;
 
 namespace Client.Main.Controls.UI.Android
 {
-    /// <summary>
-    /// 4 skill slots in the bottom-right corner.
-    /// Layout (Mobile Legends style):
-    ///   [2][3]
-    ///   [4][1 BIG]
-    /// Slot 1 is the primary (large), slots 2-4 are secondary (small).
-    /// </summary>
     public class AndroidSkillBar : UIControl
     {
-        private const int BigSize = 100;
-        private const int SmallSize = 70;
-        private const int Gap = 8;
-        private const int SlotMargin = 20;
+        private const int BigSize = 110;
+        private const int SmallSize = 74;
+        private const int Gap = 10;
+        private const int SlotMargin = 22;
 
-        private Texture2D _pixel;
-        private SkillEntryState[] _slots = new SkillEntryState[4]; // 0=primary, 1-3=secondary
+        private Texture2D _circleTex;
+        private SkillEntryState[] _slots = new SkillEntryState[4];
         private double[] _cooldownDisplay = new double[4];
         private AreaTargetSelector _areaSelector;
         private AndroidSkillMenu _skillMenu;
 
-        // Rectangle for each slot in screen coords (set in CalcLayout)
-        private Rectangle[] _slotRects = new Rectangle[4];
+        // Center points for hit-testing circles
+        private Vector2[] _slotCenters = new Vector2[4];
+        private float[] _slotRadii = new float[4];
 
         public AndroidSkillBar(AreaTargetSelector areaSelector, AndroidSkillMenu skillMenu)
         {
@@ -45,8 +39,7 @@ namespace Client.Main.Controls.UI.Android
 
         public override async System.Threading.Tasks.Task Load()
         {
-            _pixel = new Texture2D(MuGame.Instance.GraphicsDevice, 1, 1);
-            _pixel.SetData(new[] { Color.White });
+            _circleTex = CreateCircleTexture(256);
             await base.Load();
         }
 
@@ -62,7 +55,6 @@ namespace Client.Main.Controls.UI.Android
 
             CalcLayout();
 
-            // Animate cooldowns
             for (int i = 0; i < 4; i++)
                 if (_cooldownDisplay[i] > 0)
                     _cooldownDisplay[i] = Math.Max(0, _cooldownDisplay[i]
@@ -77,10 +69,12 @@ namespace Client.Main.Controls.UI.Android
                 var pos = touch.Position;
                 for (int i = 0; i < 4; i++)
                 {
-                    if (_slotRects[i].Contains((int)pos.X, (int)pos.Y))
+                    float dx = pos.X - _slotCenters[i].X;
+                    float dy = pos.Y - _slotCenters[i].Y;
+                    if (dx * dx + dy * dy <= _slotRadii[i] * _slotRadii[i])
                     {
                         AndroidHUD.ConsumedTouchIds.Add(touch.Id);
-                        OnSlotTapped(i);
+                        try { OnSlotTapped(i); } catch { }
                         break;
                     }
                 }
@@ -96,23 +90,17 @@ namespace Client.Main.Controls.UI.Android
 
             if (skillType == SkillType.Area)
             {
-                // Show area target selector
-                var hero = GetHero();
+                if (_areaSelector == null) return;
+                HeroObject hero = null;
+                if (MuGame.Instance.ActiveScene is Scenes.GameScene gs)
+                    hero = gs.Hero;
                 if (hero != null)
                     _areaSelector.Activate(skill, hero.Location);
             }
             else
             {
-                // Direct use: fire at nearest enemy or self
                 AndroidHUD.Current?.InvokeDirectSkill(skill);
             }
-        }
-
-        private HeroObject GetHero()
-        {
-            if (MuGame.Instance.ActiveScene is Scenes.GameScene gs)
-                return gs.Hero;
-            return null;
         }
 
         private void CalcLayout()
@@ -121,22 +109,29 @@ namespace Client.Main.Controls.UI.Android
             int right = vp.Width - SlotMargin;
             int bottom = vp.Height - SlotMargin;
 
-            // Slot 0 (primary, big) — bottom-right
-            _slotRects[0] = new Rectangle(right - BigSize, bottom - BigSize, BigSize, BigSize);
+            float bigR = BigSize / 2f;
+            float smallR = SmallSize / 2f;
+
+            // Slot 0 (primary big) — bottom-right
+            _slotCenters[0] = new Vector2(right - bigR, bottom - bigR);
+            _slotRadii[0] = bigR;
 
             // Slot 1 — left of big
-            _slotRects[1] = new Rectangle(right - BigSize - Gap - SmallSize, bottom - SmallSize, SmallSize, SmallSize);
+            _slotCenters[1] = new Vector2(right - BigSize - Gap - smallR, bottom - smallR);
+            _slotRadii[1] = smallR;
 
             // Slot 2 — above big
-            _slotRects[2] = new Rectangle(right - BigSize, bottom - BigSize - Gap - SmallSize, SmallSize, SmallSize);
+            _slotCenters[2] = new Vector2(right - bigR, bottom - BigSize - Gap - smallR);
+            _slotRadii[2] = smallR;
 
-            // Slot 3 — above-left
-            _slotRects[3] = new Rectangle(right - BigSize - Gap - SmallSize, bottom - BigSize - Gap - SmallSize, SmallSize, SmallSize);
+            // Slot 3 — above-left (diagonal)
+            _slotCenters[3] = new Vector2(right - BigSize - Gap - smallR, bottom - BigSize - Gap - smallR);
+            _slotRadii[3] = smallR;
         }
 
         public override void Draw(GameTime gameTime)
         {
-            if (!Visible || _pixel == null) return;
+            if (!Visible || _circleTex == null) return;
 
             CalcLayout();
             var sb = GraphicsManager.Instance.Sprite;
@@ -146,96 +141,122 @@ namespace Client.Main.Controls.UI.Android
                 SamplerState.LinearClamp, DepthStencilState.None))
             {
                 for (int i = 0; i < 4; i++)
-                {
-                    DrawSlot(sb, font, i, _slotRects[i]);
-                }
+                    DrawSlot(sb, font, i);
             }
         }
 
-        private void DrawSlot(SpriteBatch sb, SpriteFont font, int slot, Rectangle rect)
+        private void DrawSlot(SpriteBatch sb, SpriteFont font, int slot)
         {
+            var center = _slotCenters[slot];
+            float r = _slotRadii[slot];
             var skill = _slots[slot];
             var type = skill != null ? SkillDefinitions.GetSkillType(skill.SkillId) : SkillType.Self;
 
-            // Background
+            // Outer glow ring
+            Color ringColor = slot == 0
+                ? new Color(255, 200, 50, 180)
+                : new Color(150, 160, 220, 150);
+            DrawCircle(sb, center, r + 5, ringColor * 0.5f);
+
+            // Background fill
             Color bgColor = skill != null
-                ? (type == SkillType.Area ? new Color(120, 50, 20, 200)
-                 : type == SkillType.Target ? new Color(100, 80, 20, 200)
-                 : new Color(20, 60, 120, 200))
-                : new Color(40, 40, 60, 180);
+                ? (type == SkillType.Area ? new Color(160, 60, 10, 210)
+                 : type == SkillType.Target ? new Color(130, 100, 10, 210)
+                 : new Color(20, 70, 160, 210))
+                : new Color(30, 30, 55, 190);
+            DrawCircle(sb, center, r, bgColor);
 
-            sb.Draw(_pixel, rect, bgColor);
+            // Inner highlight (top half lighter)
+            DrawCircle(sb, center - new Vector2(0, r * 0.2f), r * 0.6f, Color.White * 0.06f);
 
-            // Border
-            DrawBorder(sb, rect, slot == 0 ? new Color(255, 200, 50, 200) : new Color(150, 150, 200, 180), 3);
+            // Border ring
+            DrawCircle(sb, center, r, ringColor * 0.8f);
+            DrawCircle(sb, center, r - 4, bgColor);  // re-fill to make ring look thin
 
-            if (skill != null)
+            if (_cooldownDisplay[slot] > 0)
             {
-                // Skill type icon (letter)
-                string letter = type == SkillType.Area ? "A" : type == SkillType.Target ? "T" : "S";
-                Color letterColor = type == SkillType.Area ? Color.OrangeRed
-                    : type == SkillType.Target ? Color.Yellow : Color.LightGreen;
-
-                DrawTextCentered(sb, font, letter, rect, letterColor,
-                    slot == 0 ? 1.2f : 0.9f);
-
-                // Skill level (bottom-right corner of slot)
-                if (font != null)
-                {
-                    string lvl = $"Lv{skill.SkillLevel}";
-                    var lvlPos = new Vector2(rect.Right - 32, rect.Bottom - 22);
-                    sb.DrawString(font, lvl, lvlPos, Color.White * 0.8f, 0, Vector2.Zero, 0.45f, SpriteEffects.None, 0);
-                }
-
-                // Skill name truncated
-                if (font != null)
-                {
-                    string name = SkillDatabase.GetSkillName(skill.SkillId);
-                    if (name.Length > 8) name = name[..8];
-                    var namePos = new Vector2(rect.X + 4, rect.Y + 4);
-                    sb.DrawString(font, name, namePos, Color.White * 0.7f, 0, Vector2.Zero, 0.38f, SpriteEffects.None, 0);
-                }
-
-                // Cooldown overlay
-                if (_cooldownDisplay[slot] > 0)
-                {
-                    sb.Draw(_pixel, rect, new Color(0, 0, 0, 160));
-                }
+                DrawCircle(sb, center, r - 4, new Color(0, 0, 0, 160));
             }
-            else
+
+            // Text
+            if (font != null)
             {
-                // Empty slot
-                DrawTextCentered(sb, font, $"{slot + 1}", rect, new Color(100, 100, 120, 180),
-                    slot == 0 ? 1.0f : 0.7f);
+                if (skill != null)
+                {
+                    // Type letter centered
+                    string letter = type == SkillType.Area ? "A" : type == SkillType.Target ? "T" : "S";
+                    Color lc = type == SkillType.Area ? Color.OrangeRed
+                             : type == SkillType.Target ? Color.Yellow : Color.LightGreen;
+                    float letterScale = slot == 0 ? 1.1f : 0.75f;
+                    DrawTextCentered(sb, font, letter, center + new Vector2(0, -r * 0.15f), lc, letterScale);
+
+                    // Skill name (small, at bottom of circle)
+                    string name = SkillDatabase.GetSkillName(skill.SkillId);
+                    if (name.Length > 7) name = name[..7];
+                    float nameScale = slot == 0 ? 0.42f : 0.36f;
+                    var nameSize = font.MeasureString(name) * nameScale;
+                    var namePos = new Vector2(center.X - nameSize.X / 2f, center.Y + r * 0.45f);
+                    sb.DrawString(font, name, namePos + Vector2.One, Color.Black * 0.7f, 0, Vector2.Zero, nameScale, SpriteEffects.None, 0);
+                    sb.DrawString(font, name, namePos, Color.White * 0.85f, 0, Vector2.Zero, nameScale, SpriteEffects.None, 0);
+
+                    // Level (top-right arc)
+                    string lvl = $"Lv{skill.SkillLevel}";
+                    float lvlScale = 0.38f;
+                    var lvlSize = font.MeasureString(lvl) * lvlScale;
+                    var lvlPos = new Vector2(center.X + r * 0.4f - lvlSize.X / 2f, center.Y - r * 0.82f);
+                    sb.DrawString(font, lvl, lvlPos, Color.White * 0.75f, 0, Vector2.Zero, lvlScale, SpriteEffects.None, 0);
+                }
+                else
+                {
+                    // Empty slot number
+                    string num = $"{slot + 1}";
+                    float numScale = slot == 0 ? 0.9f : 0.65f;
+                    DrawTextCentered(sb, font, num, center, new Color(100, 110, 140, 180), numScale);
+                }
             }
         }
 
-        private void DrawBorder(SpriteBatch sb, Rectangle rect, Color color, int thickness)
+        private void DrawCircle(SpriteBatch sb, Vector2 center, float radius, Color color)
         {
-            // Top
-            sb.Draw(_pixel, new Rectangle(rect.X, rect.Y, rect.Width, thickness), color);
-            // Bottom
-            sb.Draw(_pixel, new Rectangle(rect.X, rect.Bottom - thickness, rect.Width, thickness), color);
-            // Left
-            sb.Draw(_pixel, new Rectangle(rect.X, rect.Y, thickness, rect.Height), color);
-            // Right
-            sb.Draw(_pixel, new Rectangle(rect.Right - thickness, rect.Y, thickness, rect.Height), color);
+            if (radius <= 0) return;
+            int d = (int)(radius * 2);
+            var rect = new Rectangle((int)(center.X - radius), (int)(center.Y - radius), d, d);
+            sb.Draw(_circleTex, rect, color);
         }
 
         private void DrawTextCentered(SpriteBatch sb, SpriteFont font, string text,
-            Rectangle rect, Color color, float scale)
+            Vector2 center, Color color, float scale)
         {
             if (font == null) return;
             var size = font.MeasureString(text) * scale;
-            var pos = new Vector2(rect.X + rect.Width / 2f - size.X / 2f,
-                                  rect.Y + rect.Height / 2f - size.Y / 2f);
-            sb.DrawString(font, text, pos + Vector2.One, Color.Black * 0.5f, 0, Vector2.Zero, scale, SpriteEffects.None, 0);
+            var pos = center - size / 2f;
+            sb.DrawString(font, text, pos + Vector2.One, Color.Black * 0.55f, 0, Vector2.Zero, scale, SpriteEffects.None, 0);
             sb.DrawString(font, text, pos, color, 0, Vector2.Zero, scale, SpriteEffects.None, 0);
+        }
+
+        private static Texture2D CreateCircleTexture(int size)
+        {
+            var tex = new Texture2D(MuGame.Instance.GraphicsDevice, size, size);
+            var data = new Color[size * size];
+            float r = size / 2f;
+            float cx = r, cy = r;
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = x - cx, dy = y - cy;
+                    float dist = MathF.Sqrt(dx * dx + dy * dy);
+                    float alpha = MathF.Max(0f, 1f - MathF.Max(0f, dist - r + 1.5f) / 1.5f);
+                    data[y * size + x] = new Color(1f, 1f, 1f, alpha);
+                }
+            }
+            tex.SetData(data);
+            return tex;
         }
 
         public override void Dispose()
         {
-            if (_pixel != null) { _pixel.Dispose(); _pixel = null; }
+            if (_circleTex != null) { _circleTex.Dispose(); _circleTex = null; }
             base.Dispose();
         }
     }

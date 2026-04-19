@@ -77,6 +77,8 @@ namespace Client.Main.Controls
         public override async Task Load()
         {
             Objects.Add(_cursor = new CursorObject());
+            if (OperatingSystem.IsAndroid() || OperatingSystem.IsIOS())
+                _cursor.Visible = false;
             await base.Load();
         }
 
@@ -97,60 +99,63 @@ namespace Client.Main.Controls
                 return;
             }
 
-            CalculateMouseTilePos();
+            bool isMobile = OperatingSystem.IsAndroid() || OperatingSystem.IsIOS();
 
-            MonsterObject hoveredMonster = Scene.MouseHoverObject as MonsterObject;
-
-            // Handle click‐to‐move with a simple cooldown
-            if (!Scene.IsMouseInputConsumedThisFrame && // check if UI already handled the click
-                (Scene.MouseControl == this || Scene.MouseControl == World) && // ensure this world or its base is the target
-                MuGame.Instance.Mouse.LeftButton == ButtonState.Pressed &&
-                _cursorNextMoveTime <= 0f)
+            if (!isMobile)
             {
-                // If an NPC is under the cursor, consume click and don't trigger move
-                if (Scene.MouseHoverObject is NPCObject)
+                CalculateMouseTilePos();
+
+                MonsterObject hoveredMonster = Scene.MouseHoverObject as MonsterObject;
+
+                // Handle click‐to‐move with a simple cooldown
+                if (!Scene.IsMouseInputConsumedThisFrame &&
+                    (Scene.MouseControl == this || Scene.MouseControl == World) &&
+                    MuGame.Instance.Mouse.LeftButton == ButtonState.Pressed &&
+                    _cursorNextMoveTime <= 0f)
                 {
-                    if (Scene is Client.Main.Scenes.BaseScene bs)
-                        bs.SetMouseInputConsumed();
-                    _cursorNextMoveTime = 250f;
-                    return;
-                }
-                if (Walker is PlayerObject player)
-                {
-                    MonsterObject monster = hoveredMonster ?? FindMonsterAtTile(MouseTileX, MouseTileY);
-                    if (monster != null)
+                    if (Scene.MouseHoverObject is NPCObject)
                     {
-                        float attackRange = player.GetAttackRangeTiles();
-                        if (Vector2.Distance(player.Location, monster.Location) <= attackRange)
+                        if (Scene is Client.Main.Scenes.BaseScene bs)
+                            bs.SetMouseInputConsumed();
+                        _cursorNextMoveTime = 250f;
+                        return;
+                    }
+                    if (Walker is PlayerObject player)
+                    {
+                        MonsterObject monster = hoveredMonster ?? FindMonsterAtTile(MouseTileX, MouseTileY);
+                        if (monster != null)
                         {
-                            player.Attack(monster);
-                            if (Scene is Client.Main.Scenes.BaseScene bs)
-                                bs.SetMouseInputConsumed();
-                            _cursorNextMoveTime = 250f;
-                            return;
+                            float attackRange = player.GetAttackRangeTiles();
+                            if (Vector2.Distance(player.Location, monster.Location) <= attackRange)
+                            {
+                                player.Attack(monster);
+                                if (Scene is Client.Main.Scenes.BaseScene bs)
+                                    bs.SetMouseInputConsumed();
+                                _cursorNextMoveTime = 250f;
+                                return;
+                            }
                         }
                     }
+
+                    _cursorNextMoveTime = 250f;
+                    var newTile = new Vector2(MouseTileX, MouseTileY);
+
+                    if (!IsWalkable(newTile))
+                        return;
+
+                    if (!Walker.IsAlive())
+                        return;
+
+                    float worldX = newTile.X * Constants.TERRAIN_SCALE;
+                    float worldY = newTile.Y * Constants.TERRAIN_SCALE;
+                    float height = Terrain.RequestTerrainHeight(worldX, worldY) + ExtraHeight;
+                    _cursor.Position = new Vector3(worldX, worldY, height) + new Vector3(50f, 40f, 0);
+                    Walker.MoveTo(newTile);
                 }
-
-                _cursorNextMoveTime = 250f;
-                var newTile = new Vector2(MouseTileX, MouseTileY);
-
-                if (!IsWalkable(newTile))
-                    return;
-
-                // Don't allow movement if player is dead
-                if (!Walker.IsAlive())
-                    return;
-
-                float worldX = newTile.X * Constants.TERRAIN_SCALE;
-                float worldY = newTile.Y * Constants.TERRAIN_SCALE;
-                float height = Terrain.RequestTerrainHeight(worldX, worldY) + ExtraHeight;
-                _cursor.Position = new Vector3(worldX, worldY, height) + new Vector3(50f, 40f, 0);
-                Walker.MoveTo(newTile);
-            }
-            else if (_cursorNextMoveTime > 0f)
-            {
-                _cursorNextMoveTime -= (float)time.ElapsedGameTime.TotalMilliseconds;
+                else if (_cursorNextMoveTime > 0f)
+                {
+                    _cursorNextMoveTime -= (float)time.ElapsedGameTime.TotalMilliseconds;
+                }
             }
 
             var mouseState = MuGame.Instance.Mouse;

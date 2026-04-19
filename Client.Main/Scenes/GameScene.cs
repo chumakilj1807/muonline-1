@@ -47,6 +47,7 @@ namespace Client.Main.Scenes
         private Controls.UI.NotificationManager _notificationManager;
         private PartyPanelControl _partyPanel;
         private readonly (string Name, CharacterClassNumber Class, ushort Level, byte[] Appearance) _characterInfo;
+        private readonly bool _isMobile;
         private CharacterInfoWindowControl _characterInfoWindow;
         private ILogger _logger = MuGame.AppLoggerFactory?.CreateLogger<GameScene>() ?? NullLogger<GameScene>.Instance;
         private LabelControl _pingLabel; // Displays current ping
@@ -107,6 +108,7 @@ namespace Client.Main.Scenes
         public GameScene((string Name, CharacterClassNumber Class, ushort Level, byte[] Appearance) characterInfo)
         {
             _characterInfo = characterInfo;
+            _isMobile = OperatingSystem.IsAndroid() || OperatingSystem.IsIOS();
             _logger?.LogDebug($"GameScene constructor called for Character: {_characterInfo.Name} ({_characterInfo.Class})");
 
             // Create the hero with the appearance data from the character list
@@ -177,6 +179,7 @@ namespace Client.Main.Scenes
             _chatInput.BringToFront();
             DebugPanel.BringToFront();
             Cursor.BringToFront();
+            if (_isMobile) Cursor.Visible = false;
 
             // Pause/ESC menu
             _pauseMenu = new PauseMenuControl();
@@ -196,8 +199,18 @@ namespace Client.Main.Scenes
                 _skillQuickSlot.BringToFront();
             }
 
-            // On mobile, hide the PC main HUD (HP/MP orbs etc.)
-            if (isMobileEarly) _main.Visible = false;
+            // On mobile, hide the PC main HUD and other desktop-only controls
+            if (_isMobile)
+            {
+                _main.Visible = false;
+                _chatLog.Visible = false;
+                _chatInput.Visible = false;
+                _partyPanel.Visible = false;
+                _moveCommandWindow.Visible = false;
+                _inventoryControl.Visible = false;
+                _characterInfoWindow.Visible = false;
+                _pingLabel.Visible = false;
+            }
             _skillController = new GameSceneSkillController(this, _skillQuickSlot, _logger, _duelController.IsDuelAttackTarget);
 
             bool isMobile = OperatingSystem.IsAndroid() || OperatingSystem.IsIOS();
@@ -276,13 +289,12 @@ namespace Client.Main.Scenes
             // This runs async and won't block scene initialization
             _ = _uiPreloadController.StartPreloadAsync();
 
-            // Android HUD — replaces PC UI panels on mobile
-            if (OperatingSystem.IsAndroid() || OperatingSystem.IsIOS())
+            // Android HUD — created here, loaded later in LoadSceneContentWithProgress
+            if (_isMobile)
             {
                 _androidHUD = new AndroidHUD();
                 _androidHUD.SetSkillController(_skillController);
                 Controls.Add(_androidHUD);
-                _ = _androidHUD.Load();
                 _androidHUD.BringToFront();
             }
         }
@@ -465,7 +477,11 @@ namespace Client.Main.Scenes
 
                 // Finalize
                 _mapController?.UpdateLoadProgress("Game ready!", 1.0f);
-                _main.Visible = true;
+                if (!_isMobile) _main.Visible = true;
+
+                // Ensure AndroidHUD is fully loaded before game starts
+                if (_isMobile && _androidHUD != null)
+                    await _androidHUD.Load();
                 _mapController?.UpdateMapName();
             }
             finally

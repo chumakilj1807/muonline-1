@@ -43,6 +43,8 @@ namespace Client.Main.Controls.UI.Android
 
         public override async System.Threading.Tasks.Task Load()
         {
+            if (_joystick != null) return; // already loaded
+
             _areaSelector = new AreaTargetSelector();
             Controls.Add(_areaSelector);
             await _areaSelector.Load();
@@ -113,28 +115,31 @@ namespace Client.Main.Controls.UI.Android
 
         public override void Update(GameTime gameTime)
         {
-            // Clear consumed touch set each frame BEFORE child controls process touches
-            ConsumedTouchIds.Clear();
-
-            // Area selector takes priority (full-screen input capture)
-            if (_areaSelector != null && _areaSelector.IsActive)
+            try
             {
-                _areaSelector.Update(gameTime);
-                // When area selector is active, joystick still works
+                ConsumedTouchIds.Clear();
+
+                if (_areaSelector != null && _areaSelector.IsActive)
+                {
+                    _areaSelector.Update(gameTime);
+                    _joystick?.Update(gameTime);
+                    _hpBar?.Update(gameTime);
+                    return;
+                }
+
+                if (_skillMenu != null && _skillMenu.Visible)
+                {
+                    _skillMenu.Update(gameTime);
+                    _hpBar?.Update(gameTime);
+                    return;
+                }
+
                 _joystick?.Update(gameTime);
+                _skillBar?.Update(gameTime);
+                _actionBar?.Update(gameTime);
                 _hpBar?.Update(gameTime);
-                return;
             }
-
-            // Skill menu takes full input when open
-            if (_skillMenu != null && _skillMenu.Visible)
-            {
-                _skillMenu.Update(gameTime);
-                _hpBar?.Update(gameTime);
-                return;
-            }
-
-            base.Update(gameTime); // updates all children
+            catch { }
         }
 
         public override void Draw(GameTime gameTime)
