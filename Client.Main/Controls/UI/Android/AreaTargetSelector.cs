@@ -179,40 +179,42 @@ namespace Client.Main.Controls.UI.Android
             var vp = MuGame.Instance.GraphicsDevice.Viewport;
             var sb = GraphicsManager.Instance.Sprite;
 
-            // Project target tile center to screen
             if (!TryTileToScreen(_targetTile, out var screenCenter)) return;
 
-            // Project one edge tile to get screen radius
             TryTileToScreen(_targetTile + new Vector2(AreaTileRadius, 0), out var edgeScreen);
-            float screenRadius = MathF.Max(30, Vector2.Distance(
+            float screenRadius = MathF.Max(35, Vector2.Distance(
                 new Vector2(screenCenter.X, screenCenter.Y),
                 new Vector2(edgeScreen.X, edgeScreen.Y)));
+
+            float pulse = 0.7f + 0.3f * MathF.Sin((float)gameTime.TotalGameTime.TotalSeconds * 4f);
 
             using (new SpriteBatchScope(sb, SpriteSortMode.Deferred, BlendState.AlphaBlend,
                 SamplerState.LinearClamp, DepthStencilState.None))
             {
-                // Area fill circle
-                float pulse = 0.6f + 0.2f * MathF.Sin((float)gameTime.TotalGameTime.TotalSeconds * 3f);
-                var circleRect = new Rectangle(
+                // Thin ring only — draw as outer circle minus a slightly smaller circle
+                // Using the ring texture baked as donut
+                int d = (int)(screenRadius * 2);
+                var ringRect = new Rectangle(
                     (int)(screenCenter.X - screenRadius),
                     (int)(screenCenter.Y - screenRadius),
-                    (int)(screenRadius * 2), (int)(screenRadius * 2));
-                sb.Draw(_circleTex, circleRect, new Color(255, 80, 30, (int)(80 * pulse)));
+                    d, d);
 
-                // Ring edge
-                sb.Draw(_circleTex, new Rectangle(circleRect.X - 3, circleRect.Y - 3,
-                    circleRect.Width + 6, circleRect.Height + 6),
-                    new Color(255, 160, 60, (int)(180 * pulse)));
-                sb.Draw(_circleTex, circleRect, new Color(0, 0, 0, 0)); // clear interior from ring
+                // Primary ring — orange/red pulsing
+                sb.Draw(_circleTex, ringRect, new Color(255, 140, 30, (int)(220 * pulse)));
+
+                // Bright inner highlight ring (slightly smaller)
+                float innerR = screenRadius * 0.88f;
+                int di = (int)(innerR * 2);
+                var innerRect = new Rectangle(
+                    (int)(screenCenter.X - innerR),
+                    (int)(screenCenter.Y - innerR),
+                    di, di);
+                sb.Draw(_circleTex, innerRect, new Color(255, 220, 80, (int)(120 * pulse)));
 
                 // Cancel button (top-center)
                 int cx = vp.Width / 2;
-                sb.Draw(_pixel, new Rectangle(cx - 60, 10, 120, 50), new Color(200, 30, 30, 220));
-                DrawText(sb, "CANCEL", new Vector2(cx - 35, 20), Color.White, 0.7f);
-
-                // "Auto-attacking" label
-                DrawText(sb, "Auto-attacking area...",
-                    new Vector2(cx - 100, 68), Color.Yellow * 0.9f, 0.6f);
+                sb.Draw(_pixel, new Rectangle(cx - 55, 12, 110, 44), new Color(180, 20, 20, 220));
+                DrawText(sb, "CANCEL", new Vector2(cx - 32, 22), Color.White, 0.65f);
             }
         }
 
@@ -241,19 +243,28 @@ namespace Client.Main.Controls.UI.Android
             sb.DrawString(font, text, pos, color, 0, Vector2.Zero, scale, SpriteEffects.None, 0);
         }
 
-        private Texture2D CreateCircleTexture(int size)
+        // Ring (donut) texture — thick band near the edge, transparent in center
+        private static Texture2D CreateCircleTexture(int size)
         {
             var tex = new Texture2D(MuGame.Instance.GraphicsDevice, size, size);
             var data = new Color[size * size];
             float r = size / 2f;
             float cx = r, cy = r;
+            int ringWidth = Math.Max(6, size / 12);
+            float inner = r - ringWidth;
             for (int y = 0; y < size; y++)
             {
                 for (int x = 0; x < size; x++)
                 {
                     float dx = x - cx, dy = y - cy;
                     float dist = MathF.Sqrt(dx * dx + dy * dy);
-                    float alpha = MathF.Max(0f, 1f - (dist - r + 2f) / 2f);
+                    float alpha = 0f;
+                    if (dist >= inner && dist <= r)
+                    {
+                        float t = (dist - inner) / ringWidth;
+                        float fade = MathF.Min(t * 4f, (1f - t) * 4f);
+                        alpha = MathF.Clamp(fade, 0f, 1f);
+                    }
                     data[y * size + x] = new Color(1f, 1f, 1f, alpha);
                 }
             }
