@@ -120,16 +120,17 @@ namespace Client.Main.Controls.UI.Android
             if (MuGame.Instance.ActiveScene is not Scenes.GameScene gs) return;
             var hero = gs.Hero;
             if (hero == null || hero.IsDead) return;
-            if (gs.World is not WalkableWorldControl world) return;
+            if (gs.World is not WalkableWorldControl) return;
 
             var iso = new Vector2(
                 Direction.X - Direction.Y,
                 Direction.X + Direction.Y);
 
-            var targetTile = hero.Location + iso * 6f;
-            targetTile = Vector2.Clamp(targetTile,
-                Vector2.Zero,
-                new Vector2(Constants.TERRAIN_SIZE - 1, Constants.TERRAIN_SIZE - 1));
+            var raw = hero.Location + iso * 6f;
+            // BuildDirectPath requires integer coordinates to avoid infinite loop
+            var targetTile = new Vector2(
+                Math.Clamp((float)Math.Round(raw.X), 0, Constants.TERRAIN_SIZE - 1),
+                Math.Clamp((float)Math.Round(raw.Y), 0, Constants.TERRAIN_SIZE - 1));
 
             hero.MoveTo(targetTile, sendToServer: false, usePathfinding: false);
         }

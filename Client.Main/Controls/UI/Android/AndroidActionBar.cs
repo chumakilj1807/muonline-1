@@ -9,25 +9,26 @@ using System;
 namespace Client.Main.Controls.UI.Android
 {
     /// <summary>
-    /// Bottom-center action bar with buttons:
-    /// [Skills] [Teleport] [Inventory] [Stats] [Guild] [Party]
+    /// Bottom action bar — 6 round buttons with keyboard-key labels.
+    /// [sk] [M] [I] [C] [G] [P]
     /// </summary>
     public class AndroidActionBar : UIControl
     {
-        private const int ButtonSize = 60;
-        private const int ButtonSpacing = 10;
+        private const float BtnRadius = 36f;
+        private const float BtnSpacing = 14f;
 
-        private Texture2D _pixel;
-        private Rectangle[] _buttonRects = new Rectangle[6];
-        private string[] _labels = { "SKL", "TEL", "INV", "STA", "GLD", "PTY" };
-        private Color[] _colors =
+        private Texture2D _circleTex;
+
+        private Vector2[] _centers = new Vector2[6];
+        private readonly string[] _labels = { "sk", "M", "I", "C", "G", "P" };
+        private readonly Color[] _colors =
         {
-            new Color(100, 50, 160),  // Skills
-            new Color(30, 120, 180),  // Teleport
-            new Color(160, 120, 30),  // Inventory
-            new Color(30, 150, 80),   // Stats
-            new Color(150, 60, 60),   // Guild
-            new Color(60, 100, 160)   // Party
+            new Color(120, 60, 200),  // sk — skills
+            new Color(30, 130, 200),  // M  — map/teleport
+            new Color(190, 140, 20),  // I  — inventory
+            new Color(30, 160, 80),   // C  — character/stats
+            new Color(160, 50, 50),   // G  — guild
+            new Color(60, 110, 180)   // P  — party
         };
 
         public Action OnSkillsButton;
@@ -44,21 +45,20 @@ namespace Client.Main.Controls.UI.Android
 
         public override async System.Threading.Tasks.Task Load()
         {
-            _pixel = new Texture2D(MuGame.Instance.GraphicsDevice, 1, 1);
-            _pixel.SetData(new[] { Color.White });
-            CalcLayout();
+            _circleTex = CreateCircleTexture(128);
             await base.Load();
         }
 
         private void CalcLayout()
         {
             var vp = MuGame.Instance.GraphicsDevice.Viewport;
-            int totalWidth = 6 * ButtonSize + 5 * ButtonSpacing;
-            int startX = (vp.Width - totalWidth) / 2;
-            int y = vp.Height - ButtonSize - 12;
+            float diameter = BtnRadius * 2;
+            float totalW = 6 * diameter + 5 * BtnSpacing;
+            float startX = (vp.Width - totalW) / 2f + BtnRadius;
+            float cy = vp.Height - BtnRadius - 14;
 
             for (int i = 0; i < 6; i++)
-                _buttonRects[i] = new Rectangle(startX + i * (ButtonSize + ButtonSpacing), y, ButtonSize, ButtonSize);
+                _centers[i] = new Vector2(startX + i * (diameter + BtnSpacing), cy);
         }
 
         public override void Update(GameTime gameTime)
@@ -75,10 +75,12 @@ namespace Client.Main.Controls.UI.Android
                 var pos = touch.Position;
                 for (int i = 0; i < 6; i++)
                 {
-                    if (_buttonRects[i].Contains((int)pos.X, (int)pos.Y))
+                    float dx = pos.X - _centers[i].X;
+                    float dy = pos.Y - _centers[i].Y;
+                    if (dx * dx + dy * dy <= BtnRadius * BtnRadius)
                     {
                         AndroidHUD.ConsumedTouchIds.Add(touch.Id);
-                        OnButtonTapped(i);
+                        try { OnButtonTapped(i); } catch { }
                         break;
                     }
                 }
@@ -100,8 +102,9 @@ namespace Client.Main.Controls.UI.Android
 
         public override void Draw(GameTime gameTime)
         {
-            if (!Visible || _pixel == null) return;
+            if (!Visible || _circleTex == null) return;
 
+            CalcLayout();
             var sb = GraphicsManager.Instance.Sprite;
             var font = GraphicsManager.Instance.Font;
 
@@ -109,47 +112,67 @@ namespace Client.Main.Controls.UI.Android
                 SamplerState.LinearClamp, DepthStencilState.None))
             {
                 for (int i = 0; i < 6; i++)
-                {
-                    var rect = _buttonRects[i];
-
-                    // Shadow
-                    sb.Draw(_pixel, new Rectangle(rect.X + 2, rect.Y + 2, rect.Width, rect.Height),
-                        new Color(0, 0, 0, 100));
-
-                    // Button background
-                    sb.Draw(_pixel, rect, _colors[i] * 0.85f);
-
-                    // Border
-                    DrawBorder(sb, rect, new Color(200, 200, 220, 160), 2);
-
-                    // Label
-                    if (font != null)
-                    {
-                        float scale = 0.6f;
-                        var size = font.MeasureString(_labels[i]) * scale;
-                        var pos = new Vector2(
-                            rect.X + rect.Width / 2f - size.X / 2f,
-                            rect.Y + rect.Height / 2f - size.Y / 2f);
-                        sb.DrawString(font, _labels[i], pos + Vector2.One, Color.Black * 0.5f,
-                            0, Vector2.Zero, scale, SpriteEffects.None, 0);
-                        sb.DrawString(font, _labels[i], pos, Color.White,
-                            0, Vector2.Zero, scale, SpriteEffects.None, 0);
-                    }
-                }
+                    DrawButton(sb, font, i);
             }
         }
 
-        private void DrawBorder(SpriteBatch sb, Rectangle rect, Color color, int thickness)
+        private void DrawButton(SpriteBatch sb, SpriteFont font, int i)
         {
-            sb.Draw(_pixel, new Rectangle(rect.X, rect.Y, rect.Width, thickness), color);
-            sb.Draw(_pixel, new Rectangle(rect.X, rect.Bottom - thickness, rect.Width, thickness), color);
-            sb.Draw(_pixel, new Rectangle(rect.X, rect.Y, thickness, rect.Height), color);
-            sb.Draw(_pixel, new Rectangle(rect.Right - thickness, rect.Y, thickness, rect.Height), color);
+            var c = _centers[i];
+            float r = BtnRadius;
+            var col = _colors[i];
+
+            // Outer glow
+            DrawCircle(sb, c, r + 4, col * 0.3f);
+            // Fill
+            DrawCircle(sb, c, r, col * 0.85f);
+            // Inner highlight
+            DrawCircle(sb, c - new Vector2(0, r * 0.18f), r * 0.55f, Color.White * 0.07f);
+            // Border ring
+            DrawCircle(sb, c, r, new Color(220, 220, 240, 150) * 0.8f);
+            DrawCircle(sb, c, r - 3, col * 0.85f);
+
+            if (font == null) return;
+
+            string lbl = _labels[i];
+            float scale = lbl.Length > 1 ? 0.55f : 0.75f;
+            var size = font.MeasureString(lbl) * scale;
+            var pos = new Vector2(c.X - size.X / 2f, c.Y - size.Y / 2f);
+            sb.DrawString(font, lbl, pos + Vector2.One, Color.Black * 0.6f, 0, Vector2.Zero, scale, SpriteEffects.None, 0);
+            sb.DrawString(font, lbl, pos, Color.White, 0, Vector2.Zero, scale, SpriteEffects.None, 0);
+        }
+
+        private void DrawCircle(SpriteBatch sb, Vector2 center, float radius, Color color)
+        {
+            if (radius <= 0) return;
+            int d = (int)(radius * 2);
+            var rect = new Rectangle((int)(center.X - radius), (int)(center.Y - radius), d, d);
+            sb.Draw(_circleTex, rect, color);
+        }
+
+        private static Texture2D CreateCircleTexture(int size)
+        {
+            var tex = new Texture2D(MuGame.Instance.GraphicsDevice, size, size);
+            var data = new Color[size * size];
+            float r = size / 2f;
+            float cx = r, cy = r;
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = x - cx, dy = y - cy;
+                    float dist = MathF.Sqrt(dx * dx + dy * dy);
+                    float alpha = Math.Clamp(1f - Math.Max(0f, dist - r + 1.5f) / 1.5f, 0f, 1f);
+                    data[y * size + x] = new Color(1f, 1f, 1f, alpha);
+                }
+            }
+            tex.SetData(data);
+            return tex;
         }
 
         public override void Dispose()
         {
-            if (_pixel != null) { _pixel.Dispose(); _pixel = null; }
+            if (_circleTex != null) { _circleTex.Dispose(); _circleTex = null; }
             base.Dispose();
         }
     }
