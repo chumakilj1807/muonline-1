@@ -322,7 +322,7 @@ namespace Client.Main.Controls
 
             if (_objectsToInitialize.Count > 0)
             {
-                int initCount = Math.Min(OperatingSystem.IsAndroid() ? 32 : 100, _objectsToInitialize.Count);
+                int initCount = Math.Min(OperatingSystem.IsAndroid() ? 300 : 100, _objectsToInitialize.Count);
                 for (int i = 0; i < initCount; i++)
                 {
                     var obj = _objectsToInitialize.Dequeue();
@@ -825,6 +825,13 @@ namespace Client.Main.Controls
             if (worldObject.Status == GameControlStatus.NonInitialized)
             {
                 _objectsToInitialize.Enqueue(worldObject);
+            }
+            else if (worldObject.Status == GameControlStatus.Ready)
+            {
+                // Object just finished loading — rebuild visible list so it appears on screen.
+                // Without this, camera movement clears the object from _visibleObjects before
+                // it finishes loading, and it never gets re-added.
+                _dirtyVisibleObjects = true;
             }
         }
     }
