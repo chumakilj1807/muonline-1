@@ -254,29 +254,41 @@ namespace Client.Main.Controls
                 StepLogger.Log($"WorldControl.Load: OBJ instances={objectsToLoad.Count}");
             }
 
-            // Phase 3: batched parallel load with per-batch progress (25% → 90%)
+            // Phase 3: load map tile objects (25% → 90%)
             int total = objectsToLoad.Count;
-            const int BatchSize = 48;
-            LoadProgress?.Invoke("Loading map objects...", 0.25f);
-            StepLogger.Log($"WorldControl.Load: loading {total} objects in batches of {BatchSize}");
+            StepLogger.Log($"WorldControl.Load: {total} map objects, android={OperatingSystem.IsAndroid()}");
 
-            for (int i = 0; i < total; i += BatchSize)
+            if (OperatingSystem.IsAndroid())
             {
-                int end = Math.Min(i + BatchSize, total);
-                var batchTasks = new Task[end - i];
-                for (int j = i; j < end; j++)
-                {
-                    var obj = objectsToLoad[j];
-                    batchTasks[j - i] = obj.Load().ContinueWith(t =>
-                    {
-                        if (t.IsFaulted)
-                            StepLogger.Log($"WorldControl.Load: FAULT: {t.Exception?.GetBaseException()?.Message}");
-                    }, TaskContinuationOptions.ExecuteSynchronously);
-                }
-                await Task.WhenAll(batchTasks);
-                LoadProgress?.Invoke("Loading map objects...", 0.25f + 0.65f * ((float)end / total));
+                // Android: skip GPU load during loading screen to avoid OOM on large maps.
+                // Objects are already in Objects collection; enqueue for lazy load during gameplay.
+                foreach (var obj in objectsToLoad)
+                    _objectsToInitialize.Enqueue(obj);
+                LoadProgress?.Invoke("Loading map objects...", 0.90f);
+                StepLogger.Log("WorldControl.Load: objects queued for lazy load");
             }
-            StepLogger.Log("WorldControl.Load: object loading done");
+            else
+            {
+                const int BatchSize = 48;
+                LoadProgress?.Invoke("Loading map objects...", 0.25f);
+                for (int i = 0; i < total; i += BatchSize)
+                {
+                    int end = Math.Min(i + BatchSize, total);
+                    var batchTasks = new Task[end - i];
+                    for (int j = i; j < end; j++)
+                    {
+                        var obj = objectsToLoad[j];
+                        batchTasks[j - i] = obj.Load().ContinueWith(t =>
+                        {
+                            if (t.IsFaulted)
+                                StepLogger.Log($"WorldControl.Load: FAULT: {t.Exception?.GetBaseException()?.Message}");
+                        }, TaskContinuationOptions.ExecuteSynchronously);
+                    }
+                    await Task.WhenAll(batchTasks);
+                    LoadProgress?.Invoke("Loading map objects...", 0.25f + 0.65f * ((float)end / total));
+                }
+                StepLogger.Log("WorldControl.Load: object loading done");
+            }
 
             // Phase 4: audio (90% → 100%)
             LoadProgress?.Invoke("Finalizing...", 0.90f);
@@ -307,7 +319,7 @@ namespace Client.Main.Controls
 
             if (_objectsToInitialize.Count > 0)
             {
-                int initCount = Math.Min(100, _objectsToInitialize.Count);
+                int initCount = Math.Min(OperatingSystem.IsAndroid() ? 32 : 100, _objectsToInitialize.Count);
                 for (int i = 0; i < initCount; i++)
                 {
                     var obj = _objectsToInitialize.Dequeue();
