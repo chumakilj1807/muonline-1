@@ -260,12 +260,18 @@ namespace Client.Main.Controls
 
             if (OperatingSystem.IsAndroid())
             {
-                // Android: skip GPU load during loading screen to avoid OOM on large maps.
-                // Objects are already in Objects collection; enqueue for lazy load during gameplay.
+                // Android: enqueue for lazy load during gameplay (avoids OOM on large maps).
                 foreach (var obj in objectsToLoad)
                     _objectsToInitialize.Enqueue(obj);
-                LoadProgress?.Invoke("Loading map objects...", 0.90f);
-                StepLogger.Log("WorldControl.Load: objects queued for lazy load");
+                StepLogger.Log($"WorldControl.Load: {total} objects queued for lazy load");
+
+                // Animate progress 25%→90% so player sees the bar moving (not frozen)
+                const int AnimSteps = 20;
+                for (int s = 1; s <= AnimSteps; s++)
+                {
+                    LoadProgress?.Invoke($"Preparing world... ({total} objects)", 0.25f + 0.65f * ((float)s / AnimSteps));
+                    await Task.Delay(80);
+                }
             }
             else
             {
