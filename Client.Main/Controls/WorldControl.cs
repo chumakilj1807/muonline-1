@@ -322,7 +322,7 @@ namespace Client.Main.Controls
 
             if (_objectsToInitialize.Count > 0)
             {
-                int initCount = Math.Min(OperatingSystem.IsAndroid() ? 300 : 100, _objectsToInitialize.Count);
+                int initCount = Math.Min(OperatingSystem.IsAndroid() ? 48 : 100, _objectsToInitialize.Count);
                 for (int i = 0; i < initCount; i++)
                 {
                     var obj = _objectsToInitialize.Dequeue();
