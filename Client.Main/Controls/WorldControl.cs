@@ -260,12 +260,9 @@ namespace Client.Main.Controls
 
             if (OperatingSystem.IsAndroid())
             {
-                // Android: enqueue for lazy load during gameplay (avoids OOM on large maps).
-                foreach (var obj in objectsToLoad)
-                    _objectsToInitialize.Enqueue(obj);
-                StepLogger.Log($"WorldControl.Load: {total} objects queued for lazy load");
-
-                // Animate progress 25%→90% so player sees the bar moving (not frozen)
+                // Android: objects are auto-queued via OnWorldChanged when added to Objects.
+                // No explicit enqueue needed. Animate progress bar so player sees activity.
+                StepLogger.Log($"WorldControl.Load: {total} objects will lazy-load during gameplay");
                 const int AnimSteps = 20;
                 for (int s = 1; s <= AnimSteps; s++)
                 {
@@ -419,6 +416,14 @@ namespace Client.Main.Controls
             }
 
             _visibleObjects.Add(e.Control);
+
+            // On Android, walkers (hero, NPCs, monsters) must be visible immediately —
+            // don't leave them buried behind thousands of map tiles in the lazy queue.
+            if (OperatingSystem.IsAndroid() && Status == GameControlStatus.Ready
+                && e.Control is WalkerObject && e.Control.Status == GameControlStatus.NonInitialized)
+            {
+                e.Control.Load().ConfigureAwait(false);
+            }
         }
 
         private void Object_HiddenChanged(object sender, EventArgs e)
