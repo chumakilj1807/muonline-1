@@ -139,7 +139,7 @@ namespace Client.Main.Controls
         private readonly List<PlayerObject> _players = [];
         private readonly List<MonsterObject> _monsters = [];
         private readonly List<DroppedItemObject> _droppedItems = [];
-        private readonly Queue<WorldObject> _objectsToInitialize = [];
+        private readonly List<WorldObject> _objectsToInitialize = [];
         private readonly List<WorldObject> _visibleObjects = [];
         private bool _dirtyVisibleObjects = true;
 
@@ -322,11 +322,40 @@ namespace Client.Main.Controls
 
             if (_objectsToInitialize.Count > 0)
             {
-                int initCount = Math.Min(OperatingSystem.IsAndroid() ? 48 : 100, _objectsToInitialize.Count);
-                for (int i = 0; i < initCount; i++)
+                if (OperatingSystem.IsAndroid())
                 {
-                    var obj = _objectsToInitialize.Dequeue();
-                    obj.Load().ConfigureAwait(false);
+                    // Android: only load objects near the camera to avoid OOM.
+                    // Use camera target (hero position) as centre; load within radius.
+                    var cam = Camera.Instance.Target;
+                    var cam2 = new Vector2(cam.X, cam.Y);
+                    const float RadiusSq = 1800f * 1800f; // ~1800 world units radius
+                    int loaded = 0;
+                    for (int i = _objectsToInitialize.Count - 1; i >= 0 && loaded < 32; i--)
+                    {
+                        var obj = _objectsToInitialize[i];
+                        if (obj.Status != GameControlStatus.NonInitialized)
+                        {
+                            _objectsToInitialize.RemoveAt(i);
+                            continue;
+                        }
+                        var p = new Vector2(obj.Position.X, obj.Position.Y);
+                        if (Vector2.DistanceSquared(cam2, p) <= RadiusSq)
+                        {
+                            _objectsToInitialize.RemoveAt(i);
+                            obj.Load().ConfigureAwait(false);
+                            loaded++;
+                        }
+                    }
+                }
+                else
+                {
+                    int initCount = Math.Min(100, _objectsToInitialize.Count);
+                    for (int i = 0; i < initCount; i++)
+                    {
+                        var obj = _objectsToInitialize[0];
+                        _objectsToInitialize.RemoveAt(0);
+                        obj.Load().ConfigureAwait(false);
+                    }
                 }
             }
 
@@ -824,7 +853,7 @@ namespace Client.Main.Controls
         {
             if (worldObject.Status == GameControlStatus.NonInitialized)
             {
-                _objectsToInitialize.Enqueue(worldObject);
+                _objectsToInitialize.Add(worldObject);
             }
             else if (worldObject.Status == GameControlStatus.Ready)
             {
