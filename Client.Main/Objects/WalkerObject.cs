@@ -128,7 +128,7 @@ namespace Client.Main.Objects
             BoundingBoxLocal = new BoundingBox(new Vector3(-40, -40, 0), new Vector3(40, 40, 180));
         }
 
-        public new virtual async Task Load()
+        public override async Task Load()
         {
             MoveTargetPosition = Vector3.Zero;
             _previousScrollValue = MuGame.Instance.Mouse.ScrollWheelValue;
