@@ -59,6 +59,12 @@ namespace Client.Main.Scenes
                             await npcMonster.Load();
                             w.Objects.Add(npcMonster);
 
+                            if (npcMonster.World?.Terrain != null)
+                            {
+                                npcMonster.MoveTargetPosition = npcMonster.TargetPosition;
+                                npcMonster.Position = npcMonster.TargetPosition;
+                            }
+
                             if (npcMonster is MonsterObject)
                                 _activeMonsterIds.Add(s.Id);
                             else
@@ -103,6 +109,12 @@ namespace Client.Main.Scenes
                     {
                         await remote.Load();
                         w.Objects.Add(remote);
+
+                        if (remote.World?.Terrain != null)
+                        {
+                            remote.MoveTargetPosition = remote.TargetPosition;
+                            remote.Position = remote.TargetPosition;
+                        }
 
                         _activePlayerIds.Add(s.Id);
 

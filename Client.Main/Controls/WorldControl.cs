@@ -338,8 +338,10 @@ namespace Client.Main.Controls
                             _objectsToInitialize.RemoveAt(i);
                             continue;
                         }
+                        // Walkers (hero/NPCs/monsters) and unpositioned objects bypass radius gate
+                        bool bypass = obj is WalkerObject || obj.Position == Vector3.Zero;
                         var p = new Vector2(obj.Position.X, obj.Position.Y);
-                        if (Vector2.DistanceSquared(cam2, p) <= RadiusSq)
+                        if (bypass || Vector2.DistanceSquared(cam2, p) <= RadiusSq)
                         {
                             _objectsToInitialize.RemoveAt(i);
                             obj.Load().ConfigureAwait(false);
@@ -446,10 +448,11 @@ namespace Client.Main.Controls
 
             _visibleObjects.Add(e.Control);
 
-            // On Android, walkers (hero, NPCs, monsters) must be visible immediately —
-            // don't leave them buried behind thousands of map tiles in the lazy queue.
-            if (OperatingSystem.IsAndroid() && Status == GameControlStatus.Ready
-                && e.Control is WalkerObject && e.Control.Status == GameControlStatus.NonInitialized)
+            // On Android, walkers (hero, NPCs, monsters) must be loaded immediately —
+            // bypass the lazy queue regardless of world status.
+            if (OperatingSystem.IsAndroid()
+                && e.Control is WalkerObject
+                && e.Control.Status == GameControlStatus.NonInitialized)
             {
                 e.Control.Load().ConfigureAwait(false);
             }
