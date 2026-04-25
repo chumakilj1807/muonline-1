@@ -447,15 +447,6 @@ namespace Client.Main.Controls
             }
 
             _visibleObjects.Add(e.Control);
-
-            // On Android, walkers (hero, NPCs, monsters) must be loaded immediately —
-            // bypass the lazy queue regardless of world status.
-            if (OperatingSystem.IsAndroid()
-                && e.Control is WalkerObject
-                && e.Control.Status == GameControlStatus.NonInitialized)
-            {
-                e.Control.Load().ConfigureAwait(false);
-            }
         }
 
         private void Object_HiddenChanged(object sender, EventArgs e)
