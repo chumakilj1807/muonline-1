@@ -222,6 +222,13 @@ namespace Client.Main.Content
                 if (!File.Exists(path))
                 {
                     _logger?.LogDebug($"Model not found: {path}");
+                    if (OperatingSystem.IsAndroid())
+                    {
+                        var rel = path.StartsWith(Constants.DataPath, StringComparison.OrdinalIgnoreCase)
+                            ? path.Substring(Constants.DataPath.Length).TrimStart('/', '\\')
+                            : path;
+                        Client.Main.Core.Utilities.StepLogger.Log($"BMDLoader: MISSING {rel}");
+                    }
                     return null;
                 }
 
@@ -272,6 +279,8 @@ namespace Client.Main.Content
             catch (Exception e)
             {
                 Console.WriteLine($"Failed to load asset {path}: {e.Message}");
+                if (OperatingSystem.IsAndroid())
+                    Client.Main.Core.Utilities.StepLogger.Log($"BMDLoader: EXCEPTION {System.IO.Path.GetFileName(path)}: {e.GetType().Name}: {e.Message}");
                 return null;
             }
         }

@@ -338,6 +338,7 @@ namespace Client.Main.Objects
                 _scriptTextures = null;
                 _dataTextures = null;
                 _logger?.LogDebug("Model is null for {ObjectName}. Clearing buffers. This is likely an unequip action.", ObjectName);
+                StepLogger.Log($"ModelObject.LoadContent: MODEL NULL {GetType().Name}");
                 Status = GameControlStatus.Ready;
                 return;
             }

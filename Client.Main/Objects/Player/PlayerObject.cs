@@ -227,6 +227,7 @@ namespace Client.Main.Objects.Player
         public override async Task Load()
         {
             Model = await BMDLoader.Instance.Prepare("Player/Player.bmd");
+            Client.Main.Core.Utilities.StepLogger.Log($"PlayerObject.Load: model={(Model == null ? "NULL" : "OK")} isMain={IsMainWalker} status={Status} type={GetType().Name}");
             CacheHeadBoneHierarchy();
             InitializeActionSpeeds();
 
@@ -249,6 +250,7 @@ namespace Client.Main.Objects.Player
                 await UpdateEquipmentAppearanceAsync();
             }
 
+            Client.Main.Core.Utilities.StepLogger.Log($"PlayerObject.Load: before base.Load model={(Model == null ? "NULL" : "OK")} status={Status} type={GetType().Name}");
             await base.Load();
 
             UpdateWorldBoundingBox();

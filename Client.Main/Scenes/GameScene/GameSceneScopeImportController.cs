@@ -57,13 +57,15 @@ namespace Client.Main.Scenes
                         try
                         {
                             await npcMonster.Load();
-                            w.Objects.Add(npcMonster);
 
+                            // Set position before Add so BoundingBoxWorld is correct when OnObjectAdded fires
                             if (npcMonster.World?.Terrain != null)
                             {
                                 npcMonster.MoveTargetPosition = npcMonster.TargetPosition;
                                 npcMonster.Position = npcMonster.TargetPosition;
                             }
+
+                            w.Objects.Add(npcMonster);
 
                             if (npcMonster is MonsterObject)
                                 _activeMonsterIds.Add(s.Id);
@@ -108,13 +110,14 @@ namespace Client.Main.Scenes
                     try
                     {
                         await remote.Load();
-                        w.Objects.Add(remote);
 
                         if (remote.World?.Terrain != null)
                         {
                             remote.MoveTargetPosition = remote.TargetPosition;
                             remote.Position = remote.TargetPosition;
                         }
+
+                        w.Objects.Add(remote);
 
                         _activePlayerIds.Add(s.Id);
 
