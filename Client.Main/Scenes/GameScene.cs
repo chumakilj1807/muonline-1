@@ -432,6 +432,14 @@ namespace Client.Main.Scenes
 
                     await _hero.Load();
 
+                    // WalkerObject.OnLocationChanged skips Position update when oldLocation == Zero
+                    // (first assignment). Hydrate Position explicitly so frustum culling is correct.
+                    if (_hero.World?.Terrain != null)
+                    {
+                        _hero.MoveTargetPosition = _hero.TargetPosition;
+                        _hero.Position = _hero.TargetPosition;
+                    }
+
                     _logger?.LogDebug($"GameScene.LoadSceneContentWithProgress: _hero.NetworkId after Load(): {_hero.NetworkId:X4}");
                     _scopeImportController?.EnsureHeroNetworkId(expectedNetworkId, "after hero Load()");
                 }
