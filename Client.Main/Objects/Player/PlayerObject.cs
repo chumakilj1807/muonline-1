@@ -608,6 +608,8 @@ namespace Client.Main.Objects.Player
 
             // Ensure base body model is correct for the character's class
             var newClass = (CharacterClassNumber)charState.Class;
+            if (OperatingSystem.IsAndroid())
+                Client.Main.Core.Utilities.StepLogger.Log($"UpdateAppearanceFromInventory: charState.Class={charState.Class}({(int)charState.Class}) _characterClass={_characterClass} newClass={newClass} invCount={inventory.Count} eqSlots={string.Join(",", inventory.Keys.Where(k => k < 12))}");
             if (CharacterClass != newClass)
             {
                 CharacterClass = newClass;
@@ -3854,10 +3856,16 @@ namespace Client.Main.Objects.Player
                 {
                     _helmModelPath = modelPath;
                 }
-                part.Model = await BMDLoader.Instance.Prepare(modelPath);
-                if (part.Model == null)
+                var bmd = await BMDLoader.Instance.Prepare(modelPath);
+                if (OperatingSystem.IsAndroid())
+                    Client.Main.Core.Utilities.StepLogger.Log($"LoadPartAsync: path={modelPath} result={(bmd == null ? "NULL" : "OK")} part={part.GetType().Name}");
+                if (bmd != null)
                 {
-                    _logger?.LogWarning("[PlayerObject] Failed to load model {Path} for {Part}", modelPath, part.GetType().Name);
+                    part.Model = bmd;
+                }
+                else
+                {
+                    _logger?.LogWarning("[PlayerObject] Failed to load model {Path} for {Part}, keeping existing model", modelPath, part.GetType().Name);
                 }
             }
         }

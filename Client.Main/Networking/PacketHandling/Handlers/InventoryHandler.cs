@@ -679,114 +679,122 @@ namespace Client.Main.Networking.PacketHandling.Handlers
         /// </summary>
         private void UpdateInventoryFromPacket(ReadOnlySpan<byte> span)
         {
-            _characterState.ClearInventory();
-
-            int count = 0, offset = 0, dataSize = 0;
-            switch (_targetVersion)
+            _characterState.BeginEquipmentBatch();
+            try
             {
-                case TargetProtocolVersion.Season6:
-                    if (span.Length < 6)
-                    {
-                        _logger.LogWarning("Inventory packet too short for S6 header: {Length}", span.Length);
-                        return;
-                    }
+                _characterState.ClearInventory();
 
-                    count = System.Buffers.Binary.BinaryPrimitives.ReadUInt16LittleEndian(span.Slice(4, 2));
-                    offset = 6;
-                    _logger.LogInformation("Updating inventory (S6): {Count} items.", count);
-                    break;
-
-                case TargetProtocolVersion.Version097:
-                    if (span[0] != 0xC1 || span[2] != 0x10)
-                    {
-                        _logger.LogWarning("Unexpected packet instead of 0.97 inventory.");
-                        return;
-                    }
-                    count = span[4];
-                    offset = 5;
-                    dataSize = 11;
-                    _logger.LogInformation("Updating inventory (0.97): {Count} items.", count);
-                    break;
-
-                case TargetProtocolVersion.Version075:
-                    if (span[0] != 0xC1 || span[2] != 0x10)
-                    {
-                        _logger.LogWarning("Unexpected packet instead of 0.75 inventory.");
-                        return;
-                    }
-                    count = span[4];
-                    offset = 5;
-                    dataSize = 7;
-                    _logger.LogInformation("Updating inventory (0.75): {Count} items.", count);
-                    break;
-
-                default:
-                    _logger.LogWarning("Inventory handling not implemented for version {Version}.", _targetVersion);
-                    return;
-            }
-
-            int slotSize = 1 + dataSize;
-            int pos = offset;
-            if (_targetVersion == TargetProtocolVersion.Season6)
-            {
-                int remaining = span.Length - offset;
-                bool fixedLength = count > 0 && remaining == count * (1 + 12);
-                dataSize = fixedLength ? 12 : 0;
-
-                for (int i = 0; i < count; i++)
+                int count = 0, offset = 0, dataSize = 0;
+                switch (_targetVersion)
                 {
-                    if (pos + 1 > span.Length)
-                    {
-                        _logger.LogWarning("Inventory packet too short parsing item {Index}.", i);
-                        break;
-                    }
-
-                    byte slot = span[pos];
-                    pos += 1;
-
-                    ReadOnlySpan<byte> itemSpan = span.Slice(pos);
-                    int length = dataSize;
-                    if (!fixedLength)
-                    {
-                        if (!ItemDataParser.TryGetExtendedItemLength(itemSpan, out length) || pos + length > span.Length)
+                    case TargetProtocolVersion.Season6:
+                        if (span.Length < 6)
                         {
-                            _logger.LogWarning("Inventory item {Index} has invalid extended data length.", i);
+                            _logger.LogWarning("Inventory packet too short for S6 header: {Length}", span.Length);
+                            return;
+                        }
+
+                        count = System.Buffers.Binary.BinaryPrimitives.ReadUInt16LittleEndian(span.Slice(4, 2));
+                        offset = 6;
+                        _logger.LogInformation("Updating inventory (S6): {Count} items.", count);
+                        break;
+
+                    case TargetProtocolVersion.Version097:
+                        if (span[0] != 0xC1 || span[2] != 0x10)
+                        {
+                            _logger.LogWarning("Unexpected packet instead of 0.97 inventory.");
+                            return;
+                        }
+                        count = span[4];
+                        offset = 5;
+                        dataSize = 11;
+                        _logger.LogInformation("Updating inventory (0.97): {Count} items.", count);
+                        break;
+
+                    case TargetProtocolVersion.Version075:
+                        if (span[0] != 0xC1 || span[2] != 0x10)
+                        {
+                            _logger.LogWarning("Unexpected packet instead of 0.75 inventory.");
+                            return;
+                        }
+                        count = span[4];
+                        offset = 5;
+                        dataSize = 7;
+                        _logger.LogInformation("Updating inventory (0.75): {Count} items.", count);
+                        break;
+
+                    default:
+                        _logger.LogWarning("Inventory handling not implemented for version {Version}.", _targetVersion);
+                        return;
+                }
+
+                int slotSize = 1 + dataSize;
+                int pos = offset;
+                if (_targetVersion == TargetProtocolVersion.Season6)
+                {
+                    int remaining = span.Length - offset;
+                    bool fixedLength = count > 0 && remaining == count * (1 + 12);
+                    dataSize = fixedLength ? 12 : 0;
+
+                    for (int i = 0; i < count; i++)
+                    {
+                        if (pos + 1 > span.Length)
+                        {
+                            _logger.LogWarning("Inventory packet too short parsing item {Index}.", i);
                             break;
                         }
-                    }
 
-                    if (pos + length > span.Length)
+                        byte slot = span[pos];
+                        pos += 1;
+
+                        ReadOnlySpan<byte> itemSpan = span.Slice(pos);
+                        int length = dataSize;
+                        if (!fixedLength)
+                        {
+                            if (!ItemDataParser.TryGetExtendedItemLength(itemSpan, out length) || pos + length > span.Length)
+                            {
+                                _logger.LogWarning("Inventory item {Index} has invalid extended data length.", i);
+                                break;
+                            }
+                        }
+
+                        if (pos + length > span.Length)
+                        {
+                            _logger.LogWarning("Inventory packet too short parsing item {Index}.", i);
+                            break;
+                        }
+
+                        var itemData = span.Slice(pos, length).ToArray();
+                        pos += length;
+
+                        _characterState.AddOrUpdateInventoryItem(slot, itemData);
+
+                        string name = ItemDatabase.GetItemName(itemData) ?? "Unknown Item";
+                        _logger.LogDebug("Slot {Slot}: {Name} (DataLen: {Len})", slot, name, length);
+                    }
+                }
+                else
+                {
+                    for (int i = 0; i < count; i++, pos += slotSize)
                     {
-                        _logger.LogWarning("Inventory packet too short parsing item {Index}.", i);
-                        break;
+                        if (pos + slotSize > span.Length)
+                        {
+                            _logger.LogWarning("Inventory packet too short parsing item {Index}.", i);
+                            break;
+                        }
+
+                        byte slot = span[pos];
+                        var itemData = span.Slice(pos + 1, dataSize).ToArray();
+                        _characterState.AddOrUpdateInventoryItem(slot, itemData);
+
+                        string name = ItemDatabase.GetItemName(itemData) ?? "Unknown Item";
+                        _logger.LogDebug("Slot {Slot}: {Name} (DataLen: {Len})", slot, name, dataSize);
                     }
-
-                    var itemData = span.Slice(pos, length).ToArray();
-                    pos += length;
-
-                    _characterState.AddOrUpdateInventoryItem(slot, itemData);
-
-                    string name = ItemDatabase.GetItemName(itemData) ?? "Unknown Item";
-                    _logger.LogDebug("Slot {Slot}: {Name} (DataLen: {Len})", slot, name, length);
                 }
             }
-            else
+            finally
             {
-                for (int i = 0; i < count; i++, pos += slotSize)
-                {
-                    if (pos + slotSize > span.Length)
-                    {
-                        _logger.LogWarning("Inventory packet too short parsing item {Index}.", i);
-                        break;
-                    }
-
-                    byte slot = span[pos];
-                    var itemData = span.Slice(pos + 1, dataSize).ToArray();
-                    _characterState.AddOrUpdateInventoryItem(slot, itemData);
-
-                    string name = ItemDatabase.GetItemName(itemData) ?? "Unknown Item";
-                    _logger.LogDebug("Slot {Slot}: {Name} (DataLen: {Len})", slot, name, dataSize);
-                }
+                _characterState.EndEquipmentBatch();
             }
         }
     }

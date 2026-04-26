@@ -155,6 +155,8 @@ namespace Client.Main.Core.Client
         public uint InventoryZen { get; set; } = 0;
         public event Action MoneyChanged;
         private byte? _pendingSellSlot;
+        private bool _suppressEquipmentChanged = false;
+        private bool _equipmentChangedDirty = false;
         private byte? _pendingVaultMoveFrom;
         private byte? _pendingVaultMoveTo;
         private byte? _pendingChaosMachineMoveFrom;
@@ -488,6 +490,29 @@ namespace Client.Main.Core.Client
         {
             EquipmentChanged?.Invoke();
             _logger.LogTrace("EquipmentChanged event raised.");
+        }
+
+        /// <summary>
+        /// Suppresses individual EquipmentChanged events until EndEquipmentBatch is called.
+        /// </summary>
+        public void BeginEquipmentBatch()
+        {
+            _suppressEquipmentChanged = true;
+            _equipmentChangedDirty = false;
+        }
+
+        /// <summary>
+        /// Ends a batch update and fires EquipmentChanged once if any equipment slot changed.
+        /// </summary>
+        public void EndEquipmentBatch()
+        {
+            _suppressEquipmentChanged = false;
+            if (_equipmentChangedDirty)
+            {
+                _equipmentChangedDirty = false;
+                EquipmentChanged?.Invoke();
+                _logger.LogTrace("EquipmentChanged event raised (batch end).");
+            }
         }
 
         /// <summary>
@@ -1452,7 +1477,10 @@ namespace Client.Main.Core.Client
             InventoryChanged?.Invoke();
             if (slot < 12) // equipment slots 0..11
             {
-                EquipmentChanged?.Invoke();
+                if (_suppressEquipmentChanged)
+                    _equipmentChangedDirty = true;
+                else
+                    EquipmentChanged?.Invoke();
 
                 // Recalculate attack speeds if equipment changes affect attack speed
                 // (weapons, rings, pendants with excellent speed options)
