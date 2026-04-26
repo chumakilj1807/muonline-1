@@ -430,20 +430,30 @@ namespace Client.Main.Controls
             e.Control.HiddenChanged += Object_HiddenChanged;
 
             TrackObjectType(e.Control);
-            if (e.Control is WalkerObject walker &&
-                walker.NetworkId != 0 &&
-                walker.NetworkId != 0xFFFF)
+            if (e.Control is WalkerObject walker)
             {
-                if (WalkerObjectsById.TryGetValue(walker.NetworkId, out var existing))
+                // Pre-hydrate Position so the frustum rebuild (which may fire before the
+                // first Update()) doesn't cull this object while it's still at (0,0,0).
+                var tp = walker.TargetPosition;
+                if (tp != Vector3.Zero)
                 {
-                    if (!ReferenceEquals(existing, walker))
-                    {
-                        _logger?.LogWarning("Replacing WalkerObject ID {Id:X4} - old: {OldType}, new: {NewType}",
-                                           walker.NetworkId, existing.GetType().Name, walker.GetType().Name);
-                        existing.Dispose(); // Dispose the old one
-                    }
+                    walker.Position = tp;
+                    walker.MoveTargetPosition = tp;
                 }
-                WalkerObjectsById[walker.NetworkId] = walker; // Always update/add
+
+                if (walker.NetworkId != 0 && walker.NetworkId != 0xFFFF)
+                {
+                    if (WalkerObjectsById.TryGetValue(walker.NetworkId, out var existing))
+                    {
+                        if (!ReferenceEquals(existing, walker))
+                        {
+                            _logger?.LogWarning("Replacing WalkerObject ID {Id:X4} - old: {OldType}, new: {NewType}",
+                                               walker.NetworkId, existing.GetType().Name, walker.GetType().Name);
+                            existing.Dispose();
+                        }
+                    }
+                    WalkerObjectsById[walker.NetworkId] = walker;
+                }
             }
 
             _visibleObjects.Add(e.Control);

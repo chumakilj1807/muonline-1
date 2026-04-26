@@ -130,7 +130,16 @@ namespace Client.Main.Objects
 
         public override async Task Load()
         {
-            MoveTargetPosition = Vector3.Zero;
+            // Keep existing position if already set (e.g. pre-hydrated in OnObjectAdded).
+            // Only reset to TargetPosition if MoveTargetPosition is still Zero to avoid
+            // making the object "move" toward (0,0,0) and get frustum-culled.
+            if (MoveTargetPosition == Vector3.Zero)
+            {
+                var tp = TargetPosition;
+                MoveTargetPosition = tp;
+                if (Position == Vector3.Zero)
+                    Position = tp;
+            }
             _previousScrollValue = MuGame.Instance.Mouse.ScrollWheelValue;
             _cameraYaw = _defaultCameraYaw;
             _cameraPitch = _defaultCameraPitch;
