@@ -361,25 +361,15 @@ namespace Client.Main.Objects
             StepLogger.Log($"ModelObject.LoadContent: preloading textures {GetType().Name}");
             var texturePreloadTasks = new List<Task>();
 
+            // Pass 1: resolve paths and kick off async texture loading.
             for (int meshIndex = 0; meshIndex < meshCount; meshIndex++)
             {
                 var mesh = Model.Meshes[meshIndex];
                 string texturePath = BMDLoader.Instance.GetTexturePath(Model, mesh.TexturePath);
-
                 _meshTexturePath[meshIndex] = texturePath;
 
                 if (!string.IsNullOrEmpty(texturePath))
-                {
                     texturePreloadTasks.Add(TextureLoader.Instance.Prepare(texturePath));
-                }
-
-                _boneTextures[meshIndex] = TextureLoader.Instance.GetTexture2D(texturePath);
-                _scriptTextures[meshIndex] = TextureLoader.Instance.GetScript(texturePath);
-                _dataTextures[meshIndex] = TextureLoader.Instance.Get(texturePath);
-
-                _meshIsRGBA[meshIndex] = _dataTextures[meshIndex]?.Components == 4;
-                _meshHiddenByScript[meshIndex] = _scriptTextures[meshIndex]?.HiddenMesh ?? false;
-                _meshBlendByScript[meshIndex] = _scriptTextures[meshIndex]?.Bright ?? false;
             }
 
             if (texturePreloadTasks.Count > 0)
@@ -387,6 +377,20 @@ namespace Client.Main.Objects
                 StepLogger.Log($"ModelObject.LoadContent: awaiting {texturePreloadTasks.Count} texture tasks {GetType().Name}");
                 await Task.WhenAll(texturePreloadTasks);
                 StepLogger.Log($"ModelObject.LoadContent: textures done {GetType().Name}");
+            }
+
+            // Pass 2: texture data is now in cache — resolve to GPU objects and script metadata.
+            // GetTexture2D creates the Texture2D GPU object; it must be called after Prepare completes.
+            for (int meshIndex = 0; meshIndex < meshCount; meshIndex++)
+            {
+                string texturePath = _meshTexturePath[meshIndex];
+                _boneTextures[meshIndex] = TextureLoader.Instance.GetTexture2D(texturePath);
+                _scriptTextures[meshIndex] = TextureLoader.Instance.GetScript(texturePath);
+                _dataTextures[meshIndex] = TextureLoader.Instance.Get(texturePath);
+
+                _meshIsRGBA[meshIndex] = _dataTextures[meshIndex]?.Components == 4;
+                _meshHiddenByScript[meshIndex] = _scriptTextures[meshIndex]?.HiddenMesh ?? false;
+                _meshBlendByScript[meshIndex] = _scriptTextures[meshIndex]?.Bright ?? false;
             }
 
             _sortTextureHintDirty = true;

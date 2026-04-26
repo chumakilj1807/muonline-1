@@ -254,6 +254,17 @@ namespace Client.Main.Objects
         {
             if (!Visible || _boneIndexBuffers == null) return;
 
+            // Lazy texture resolution: if LoadContent ran on a background thread, GetTexture2D
+            // may have failed to create GL objects. Retry here, which is always on the main/GL thread.
+            if (_boneTextures != null && _meshTexturePath != null)
+            {
+                for (int i = 0; i < _boneTextures.Length; i++)
+                {
+                    if (_boneTextures[i] == null && i < _meshTexturePath.Length && !string.IsNullOrEmpty(_meshTexturePath[i]))
+                        _boneTextures[i] = TextureLoader.Instance.GetTexture2D(_meshTexturePath[i]);
+                }
+            }
+
             var gd = GraphicsDevice;
             var prevCull = gd.RasterizerState;
             gd.RasterizerState = _cullClockwise;
