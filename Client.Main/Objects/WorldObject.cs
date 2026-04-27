@@ -31,6 +31,9 @@ namespace Client.Main.Objects
         private bool _isTransformDirty = true;
         private bool _hidden = false;
         private GameControlStatus _status = GameControlStatus.NonInitialized;
+        // Atomic gate: 0=not started, 1=Load() in progress or done. Prevents double-load
+        // when Update() auto-load fires while an async Load() is already awaiting equipment.
+        private int _loadClaimed = 0;
 
         private ILogger _logger = ModelObject.AppLoggerFactory?.CreateLogger<WorldObject>();
 
@@ -172,7 +175,9 @@ namespace Client.Main.Objects
 
         public virtual async Task Load()
         {
-            if (Status != GameControlStatus.NonInitialized)
+            // Atomically claim the load slot — only one caller proceeds even if
+            // Update() auto-load races with an explicit await Load() call.
+            if (System.Threading.Interlocked.CompareExchange(ref _loadClaimed, 1, 0) != 0)
                 return;
 
             try
@@ -396,6 +401,7 @@ namespace Client.Main.Objects
         {
             if (Status == GameControlStatus.Disposed)
                 return;
+            System.Threading.Interlocked.Exchange(ref _loadClaimed, 0);
 
             if (Status == GameControlStatus.Initializing)
             {
