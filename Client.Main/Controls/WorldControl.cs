@@ -432,14 +432,19 @@ namespace Client.Main.Controls
             TrackObjectType(e.Control);
             if (e.Control is WalkerObject walker)
             {
-                // Pre-hydrate Position so the frustum rebuild (which may fire before the
-                // first Update()) doesn't cull this object while it's still at (0,0,0).
+                // Pre-hydrate Position so the frustum rebuild doesn't cull this object
+                // while it's still at (0,0,0).
                 var tp = walker.TargetPosition;
                 if (tp != Vector3.Zero)
                 {
                     walker.Position = tp;
                     walker.MoveTargetPosition = tp;
                 }
+
+                // Load immediately — WalkerObjects must never wait in the lazy queue.
+                // The Load() guard (Status != NonInitialized → early return) makes this
+                // safe even if ScopeHandler or GameScene also calls Load() concurrently.
+                _ = walker.Load();
 
                 if (walker.NetworkId != 0 && walker.NetworkId != 0xFFFF)
                 {
@@ -857,13 +862,15 @@ namespace Client.Main.Controls
         {
             if (worldObject.Status == GameControlStatus.NonInitialized)
             {
-                _objectsToInitialize.Add(worldObject);
+                // WalkerObjects (Hero/NPC/Monster) must never go into the lazy queue.
+                // They load immediately via OnObjectAdded. Queuing them causes them to
+                // appear then vanish because the queue processes them out of order with
+                // their own Load() calls from ScopeHandler/GameScene.
+                if (worldObject is not WalkerObject)
+                    _objectsToInitialize.Add(worldObject);
             }
             else if (worldObject.Status == GameControlStatus.Ready)
             {
-                // Object just finished loading — rebuild visible list so it appears on screen.
-                // Without this, camera movement clears the object from _visibleObjects before
-                // it finishes loading, and it never gets re-added.
                 _dirtyVisibleObjects = true;
             }
         }
