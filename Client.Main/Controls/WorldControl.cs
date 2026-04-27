@@ -861,7 +861,10 @@ namespace Client.Main.Controls
                 // They load immediately via OnObjectAdded. Queuing them causes them to
                 // appear then vanish because the queue processes them out of order with
                 // their own Load() calls from ScopeHandler/GameScene.
-                if (worldObject is not WalkerObject)
+                // Also exclude children of WalkerObjects (equipment parts: Helm, Armor, Weapon, etc.).
+                // They are loaded by their parent's base.Load() after models are assigned.
+                // Queuing them causes MODEL NULL because the queue fires before the parent sets models.
+                if (worldObject is not WalkerObject && worldObject.Parent == null)
                     _objectsToInitialize.Add(worldObject);
             }
             else if (worldObject.Status == GameControlStatus.Ready)
