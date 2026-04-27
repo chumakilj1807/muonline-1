@@ -441,11 +441,6 @@ namespace Client.Main.Controls
                     walker.MoveTargetPosition = tp;
                 }
 
-                // Load immediately — WalkerObjects must never wait in the lazy queue.
-                // The Load() guard (Status != NonInitialized → early return) makes this
-                // safe even if ScopeHandler or GameScene also calls Load() concurrently.
-                _ = walker.Load();
-
                 if (walker.NetworkId != 0 && walker.NetworkId != 0xFFFF)
                 {
                     if (WalkerObjectsById.TryGetValue(walker.NetworkId, out var existing))
