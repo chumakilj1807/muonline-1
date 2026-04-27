@@ -313,6 +313,8 @@ namespace MuAndroid
                     .AbsolutePath;
                 Directory.CreateDirectory(stepDir);
                 var stepPath = Path.Combine(stepDir, $"MuAndroid_steps_{DateTime.Now:yyyyMMdd}.txt");
+                StepLogger.LogFilePath = stepPath;
+                StepLogger.UploadUrl = "http://192.168.1.222:8765/log";  // set null to disable upload
                 StepLogger.Write = msg =>
                 {
                     try
@@ -323,6 +325,7 @@ namespace MuAndroid
                     catch { }
                 };
                 StepLogger.Log("=== SESSION START ===");
+                StepLogger.StartUpload();
             }
             catch { /* StepLogger stays with Debug.WriteLine fallback */ }
 
