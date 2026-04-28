@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>net10.0-android</TargetFramework>
     <TargetPlatformVersion>36.0</TargetPlatformVersion>
-    <SupportedOSPlatformVersion>29</SupportedOSPlatformVersion>
+    <SupportedOSPlatformVersion>30</SupportedOSPlatformVersion>
     <ClientMainTargetFramework>net10.0-android</ClientMainTargetFramework>
     <NoWarn>$(NoWarn);XA0141;XA4211</NoWarn>
 
@@ -38,6 +38,16 @@
     <_MGCBRidSuffix Condition="'$(RuntimeIdentifier)' != ''">/$(RuntimeIdentifier)</_MGCBRidSuffix>
     <_MGCBRidSuffix Condition="'$(RuntimeIdentifier)' == ''"></_MGCBRidSuffix>
   </PropertyGroup>
+
+  <!-- Workaround: .NET Android 36.1.53 libxamarin-app.so references new-format symbols
+       but the generator still emits old-format symbols. Append the missing definitions. -->
+  <Target Name="PatchEnvironmentLl" BeforeTargets="_CompileNativeAssemblySources">
+    <ItemGroup>
+      <_EnvLlFiles Include="$(IntermediateOutputPath)android\environment.*.ll" />
+    </ItemGroup>
+    <Exec Command="powershell -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)patch_ll.ps1&quot; -LlFile &quot;%(_EnvLlFiles.Identity)&quot;"
+          Condition="Exists('%(_EnvLlFiles.Identity)')" />
+  </Target>
 
   <Target Name="PatchMGCBPaths" AfterTargets="CollectContentReferences" Condition="'$(MonoGamePlatform)' == 'Android'">
     <ItemGroup>

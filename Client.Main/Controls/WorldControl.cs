@@ -372,7 +372,10 @@ namespace Client.Main.Controls
                     if (!obj.Visible)
                         continue;
 
-                    if (obj is EffectObject || Camera.Instance.Frustum.Intersects(obj.BoundingBoxWorld))
+                    // WalkerObjects (hero/NPC/monsters) bypass frustum: their Update() moves the
+                    // camera, so excluding them from _visibleObjects before the first Update breaks
+                    // the camera-follow loop permanently.
+                    if (obj is EffectObject || obj is WalkerObject || Camera.Instance.Frustum.Intersects(obj.BoundingBoxWorld))
                         _visibleObjects.Add(obj);
                 }
 

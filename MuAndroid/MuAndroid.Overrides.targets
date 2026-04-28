@@ -153,7 +153,7 @@
       <_LlcExePath>$(_AndroidSdkPackDir)\tools\binutils\bin\llc.exe</_LlcExePath>
     </PropertyGroup>
     <Exec
-        Command="&quot;$(MSBuildThisFileDirectory)compile_ll.bat&quot; &quot;%(_AllLlSources2.Identity)&quot; &quot;$(_LlcExePath)&quot; 29"
+        Command="&quot;$(MSBuildThisFileDirectory)compile_ll.bat&quot; &quot;%(_AllLlSources2.Identity)&quot; &quot;$(_LlcExePath)&quot; 30"
         WorkingDirectory="$(MSBuildProjectDirectory)"
         Condition="'%(_AllLlSources2.Identity)' != '' And !Exists('$(MSBuildProjectDirectory)\%(_AllLlSources2.RelativeDir)%(_AllLlSources2.Filename).o')"
         IgnoreStandardErrorWarningFormat="true" />
