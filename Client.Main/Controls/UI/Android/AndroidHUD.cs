@@ -138,7 +138,18 @@ namespace Client.Main.Controls.UI.Android
         /// Priority: offensive skills first (Area/Target), then Self buffs.
         /// Called once after character skills arrive from server.
         /// </summary>
-        private static readonly ushort[] DarkLordWarriorSkills = { 55, 56, 57, 21, 22, 19, 20, 18 }; // DL native first, then warrior
+        // Warrior skills injected for DL
+        private static readonly ushort[] DarkLordWarriorSkills = { 21, 22, 19, 20, 18 };
+
+        private static bool IsDarkLordSkillSet(System.Collections.Generic.List<SkillEntryState> skills,
+            MUnique.OpenMU.Network.Packets.CharacterClassNumber cls)
+        {
+            if (cls == MUnique.OpenMU.Network.Packets.CharacterClassNumber.DarkLord ||
+                cls == MUnique.OpenMU.Network.Packets.CharacterClassNumber.LordEmperor)
+                return true;
+            // Fallback: detect by having DL-specific skill IDs (class may arrive after skills)
+            return skills.Any(s => s.SkillId >= 55 && s.SkillId <= 79);
+        }
 
         private void TryAutoPopulateSkillSlots()
         {
@@ -148,20 +159,17 @@ namespace Client.Main.Controls.UI.Android
             if (state == null) return;
 
             var skills = state.GetSkills().ToList();
-            if (skills.Count == 0) return;
 
-            // For DL: prepend warrior skills not already present
-            bool isDL = state.Class == MUnique.OpenMU.Network.Packets.CharacterClassNumber.DarkLord
-                     || state.Class == MUnique.OpenMU.Network.Packets.CharacterClassNumber.LordEmperor;
-            if (isDL)
+            // Inject warrior skills for DL; do BEFORE count check so DL gets slots even with 0 server skills
+            if (IsDarkLordSkillSet(skills, state.Class))
             {
                 var existingIds = new System.Collections.Generic.HashSet<ushort>(skills.Select(s => s.SkillId));
                 foreach (var sid in DarkLordWarriorSkills)
-                {
                     if (!existingIds.Contains(sid))
-                        skills.Insert(0, new SkillEntryState { SkillId = sid, SkillLevel = 1 });
-                }
+                        skills.Add(new SkillEntryState { SkillId = sid, SkillLevel = 1 });
             }
+
+            if (skills.Count == 0) return;
 
             // Sort: Area/Target first (offensive), then Self (buffs)
             var ordered = skills
@@ -213,7 +221,7 @@ namespace Client.Main.Controls.UI.Android
 
             var cam = Camera.Instance;
             var vp = MuGame.Instance.GraphicsDevice.Viewport;
-            const float MaxDistPx = 120f;
+            const float MaxDistPx = 200f;
 
             MonsterObject best = null;
             float bestDist = MaxDistPx * MaxDistPx;

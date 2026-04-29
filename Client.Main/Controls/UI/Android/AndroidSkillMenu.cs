@@ -71,11 +71,16 @@ namespace Client.Main.Controls.UI.Android
             _awaitingSlotChoice = false;
         }
 
-        // Warrior skills usable by Dark Lord (client-side injection)
+        // Warrior skills injected for DL
         private static readonly ushort[] DarkLordWarriorSkills = { 18, 19, 20, 21, 22 };
 
-        private static bool IsDarkLord(CharacterClassNumber cls) =>
-            cls == CharacterClassNumber.DarkLord || cls == CharacterClassNumber.LordEmperor;
+        private static bool IsDarkLord(CharacterClassNumber cls, IEnumerable<SkillEntryState> skills)
+        {
+            if (cls == CharacterClassNumber.DarkLord || cls == CharacterClassNumber.LordEmperor)
+                return true;
+            // Fallback: class may not be set yet — detect by DL-specific skill IDs
+            return skills.Any(s => s.SkillId >= 55 && s.SkillId <= 79);
+        }
 
         private void RefreshSkillList()
         {
@@ -83,15 +88,17 @@ namespace Client.Main.Controls.UI.Android
             var state = MuGame.Network?.GetCharacterState();
             if (state == null) return;
 
+            var serverSkills = state.GetSkills().ToList();
             var existingIds = new HashSet<ushort>();
-            foreach (var skill in state.GetSkills())
+
+            foreach (var skill in serverSkills)
             {
                 existingIds.Add(skill.SkillId);
                 AddSkillItem(skill);
             }
 
             // Inject warrior skills for Dark Lord if not already present
-            if (IsDarkLord(state.Class))
+            if (IsDarkLord(state.Class, serverSkills))
             {
                 foreach (var sid in DarkLordWarriorSkills)
                 {

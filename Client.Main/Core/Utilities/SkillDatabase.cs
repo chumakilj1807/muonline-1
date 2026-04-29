@@ -52,9 +52,10 @@ namespace Client.Main.Core.Utilities
         /// </summary>
         public static string GetSkillName(int skillId)
         {
+            // Hardcoded names take priority — BMD names may use a non-matching encoding
+            if (SkillDefinitions.HardcodedSkillNames.TryGetValue(skillId, out var name)) return name;
             var def = GetSkillDefinition(skillId);
             if (def?.Name != null) return def.Name;
-            if (SkillDefinitions.HardcodedSkillNames.TryGetValue(skillId, out var name)) return name;
             return $"Skill {skillId}";
         }
 
