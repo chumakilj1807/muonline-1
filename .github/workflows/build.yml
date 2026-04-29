@@ -49,28 +49,15 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore MuAndroid/MuAndroid.csproj -p:AndroidSdkDirectory=$env:ANDROID_SDK_ROOT
 
-      - name: Clean project
-        run: dotnet clean MuAndroid/MuAndroid.csproj -c Release -p:AndroidSdkDirectory=$env:ANDROID_SDK_ROOT
-
-      - name: Decode keystore
+      - name: Publish Android APK (debug, consistent signing for pm install -r)
         run: |
-          [System.IO.File]::WriteAllBytes("$env:RUNNER_TEMP\release.keystore",
-            [System.Convert]::FromBase64String("${{ secrets.ANDROID_KEYSTORE_BASE64 }}"))
-
-      - name: Publish Android APK (signed)
-        run: |
-          dotnet publish MuAndroid/MuAndroid.csproj -c Release -f net10.0-android -o publish-android `
+          dotnet publish MuAndroid/MuAndroid.csproj -c Debug -f net10.0-android -o publish-android `
             -p:AndroidSdkDirectory=$env:ANDROID_SDK_ROOT `
             -p:JavaSdkDirectory=$env:JAVA_HOME `
             -p:AcceptAndroidSdkLicenses=true `
             -p:AndroidPackageFormat=apk `
             -p:RunAOTCompilation=false `
-            -p:UseInterpreter=true `
-            -p:AndroidKeyStore=true `
-            -p:AndroidSigningKeyStore="$env:RUNNER_TEMP\release.keystore" `
-            -p:AndroidSigningKeyAlias="${{ secrets.ANDROID_KEY_ALIAS }}" `
-            -p:AndroidSigningKeyPass="${{ secrets.ANDROID_KEY_PASSWORD }}" `
-            -p:AndroidSigningStorePass="${{ secrets.ANDROID_STORE_PASSWORD }}"
+            -p:UseInterpreter=true
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
