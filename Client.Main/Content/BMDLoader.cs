@@ -200,7 +200,14 @@ namespace Client.Main.Content
 
                 path = GetActualPath(Path.Combine(Constants.DataPath, path));
                 if (_bmds.TryGetValue(path, out Task<BMD> modelTask))
-                    return modelTask;
+                {
+                    // Evict completed null entries so a missing file can be retried
+                    // after it becomes available (e.g. after data download completes).
+                    if (modelTask.IsCompletedSuccessfully && modelTask.Result == null)
+                        _bmds.Remove(path);
+                    else
+                        return modelTask;
+                }
 
                 modelTask = LoadAssetAsync(path, textureFolder);
                 _bmds.Add(path, modelTask);
