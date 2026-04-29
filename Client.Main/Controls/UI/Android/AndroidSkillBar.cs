@@ -95,8 +95,8 @@ namespace Client.Main.Controls.UI.Android
 
             if (skillType == SkillType.Target)
             {
-                // Fire at nearest visible monster (falls back to hero location if no target)
-                AndroidHUD.Current?.InvokeDirectSkill(skill);
+                // Enter tap-to-target mode: user taps a monster on screen
+                AndroidHUD.Current?.BeginTargetSelection(skill);
             }
             else if (skillType == SkillType.Self)
             {

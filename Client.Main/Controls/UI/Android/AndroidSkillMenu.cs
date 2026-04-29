@@ -7,6 +7,7 @@ using Client.Main.Core.Utilities;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input.Touch;
+using MUnique.OpenMU.Network.Packets;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -70,28 +71,51 @@ namespace Client.Main.Controls.UI.Android
             _awaitingSlotChoice = false;
         }
 
+        // Warrior skills usable by Dark Lord (client-side injection)
+        private static readonly ushort[] DarkLordWarriorSkills = { 18, 19, 20, 21, 22 };
+
+        private static bool IsDarkLord(CharacterClassNumber cls) =>
+            cls == CharacterClassNumber.DarkLord || cls == CharacterClassNumber.LordEmperor;
+
         private void RefreshSkillList()
         {
             _items.Clear();
             var state = MuGame.Network?.GetCharacterState();
             if (state == null) return;
 
+            var existingIds = new HashSet<ushort>();
             foreach (var skill in state.GetSkills())
             {
-                var type = SkillDefinitions.GetSkillType(skill.SkillId);
-                _items.Add(new SkillMenuItem
-                {
-                    Entry = skill,
-                    Name = SkillDatabase.GetSkillName(skill.SkillId),
-                    Type = type,
-                    TypeColor = type switch
-                    {
-                        SkillType.Area => new Color(255, 120, 30),
-                        SkillType.Target => new Color(255, 220, 30),
-                        _ => new Color(120, 220, 120)
-                    }
-                });
+                existingIds.Add(skill.SkillId);
+                AddSkillItem(skill);
             }
+
+            // Inject warrior skills for Dark Lord if not already present
+            if (IsDarkLord(state.Class))
+            {
+                foreach (var sid in DarkLordWarriorSkills)
+                {
+                    if (!existingIds.Contains(sid))
+                        AddSkillItem(new SkillEntryState { SkillId = sid, SkillLevel = 1 });
+                }
+            }
+        }
+
+        private void AddSkillItem(SkillEntryState skill)
+        {
+            var type = SkillDefinitions.GetSkillType(skill.SkillId);
+            _items.Add(new SkillMenuItem
+            {
+                Entry = skill,
+                Name = SkillDatabase.GetSkillName(skill.SkillId),
+                Type = type,
+                TypeColor = type switch
+                {
+                    SkillType.Area => new Color(255, 120, 30),
+                    SkillType.Target => new Color(255, 220, 30),
+                    _ => new Color(120, 220, 120)
+                }
+            });
         }
 
         public override void Update(GameTime gameTime)

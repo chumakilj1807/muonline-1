@@ -70,6 +70,13 @@ namespace Client.Main.Scenes
             return UseAreaSkill(skill, 0, hero.Location);
         }
 
+        /// <summary>Called by Android UI to fire a targeted skill at a specific monster.</summary>
+        public bool AndroidUseSkillOnMonster(Core.Client.SkillEntryState skill, MonsterObject monster)
+        {
+            if (monster == null || monster.IsDead) return false;
+            return UseSkillOnTarget(skill, monster);
+        }
+
         /// <summary>Called by Android UI to fire a targeted skill at nearest enemy.</summary>
         public bool AndroidUseSkillOnNearestTarget(Core.Client.SkillEntryState skill)
         {
