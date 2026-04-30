@@ -38,6 +38,7 @@ namespace Client.Main.Controls.UI.Android
         private bool _slotsAutoPopulated;
 
         private SkillEntryState _pendingTargetSkill;
+        private int _targetTouchConsumedId = -1; // touch ID to keep consuming after target tap
         private Texture2D _pixel;
 
         public AndroidHUD()
@@ -203,8 +204,11 @@ namespace Client.Main.Controls.UI.Android
                 if (touch.State != TouchLocationState.Pressed) continue;
 
                 AndroidHUD.ConsumedTouchIds.Add(touch.Id);
+                _targetTouchConsumedId = touch.Id; // keep consuming this touch in next frames
 
-                // Cancel on tap with no monster found
+                // Block game's own click handler (prevents auto-attack on same tap)
+                _skillController?.ConsumeMouseInput();
+
                 var monster = FindMonsterAtScreen(touch.Position);
                 if (monster != null)
                     InvokeDirectSkillOnMonster(_pendingTargetSkill, monster);
@@ -244,6 +248,20 @@ namespace Client.Main.Controls.UI.Android
             try
             {
                 ConsumedTouchIds.Clear();
+
+                // Keep consuming the touch that triggered target-mode exit until finger lifts
+                if (_targetTouchConsumedId >= 0)
+                {
+                    bool stillDown = MuGame.Instance.Touch.Any(
+                        t => t.Id == _targetTouchConsumedId && t.State != TouchLocationState.Released);
+                    if (stillDown)
+                    {
+                        ConsumedTouchIds.Add(_targetTouchConsumedId);
+                        _skillController?.ConsumeMouseInput();
+                    }
+                    else
+                        _targetTouchConsumedId = -1;
+                }
 
                 // Try to auto-fill slots once skills arrive from server
                 if (!_slotsAutoPopulated)

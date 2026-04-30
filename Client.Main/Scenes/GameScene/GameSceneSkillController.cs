@@ -77,6 +77,9 @@ namespace Client.Main.Scenes
             return UseSkillOnTarget(skill, monster);
         }
 
+        /// <summary>Blocks the game's own mouse/touch click handlers this frame (prevents auto-attack on same tap).</summary>
+        public void ConsumeMouseInput() => _scene.SetMouseInputConsumed();
+
         /// <summary>Called by Android UI to fire a targeted skill at nearest enemy.</summary>
         public bool AndroidUseSkillOnNearestTarget(Core.Client.SkillEntryState skill)
         {
