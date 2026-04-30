@@ -213,6 +213,9 @@ namespace Client.Main.Controls.UI.Android
         public void BeginTargetSelection(SkillEntryState skill)
         {
             _pendingTargetSkill = skill;
+            // Immediately block game's right-click handler — same tap that entered target mode
+            // would otherwise fire the skill via right-click and set a cooldown
+            _skillController?.ConsumeMouseInput();
         }
 
         private void CancelTargetSelection()
@@ -281,6 +284,7 @@ namespace Client.Main.Controls.UI.Android
 
                 if (_pendingTargetSkill != null)
                 {
+                    _skillController?.ConsumeMouseInput(); // block right-click every frame in target mode
                     HandleTargetSelectionTouch(gameTime);
                     _joystick?.Update(gameTime);
                     _hpBar?.Update(gameTime);
