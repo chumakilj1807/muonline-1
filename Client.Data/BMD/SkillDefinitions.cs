@@ -155,6 +155,115 @@ namespace Client.Data.BMD
         private static readonly Dictionary<int, string> SkillSounds = BuildSkillSounds();
 
         /// <summary>
+        /// Hardcoded mana and AG costs — skill.bmd values are parsed incorrectly for many skills.
+        /// Source: MU Online Season 6 skill attribute table.
+        /// </summary>
+        public static readonly IReadOnlyDictionary<int, (ushort Mana, ushort AG)> HardcodedSkillCosts =
+            new Dictionary<int, (ushort, ushort)>
+        {
+            { 0,  (0,   0) },   // Attack
+            // Wizard
+            { 1,  (42,  0) },   // Poison
+            { 2,  (100, 0) },   // Meteorite
+            { 3,  (100, 0) },   // Lightning
+            { 4,  (20,  0) },   // Fire Ball
+            { 5,  (50,  0) },   // Flame
+            { 6,  (40,  0) },   // Teleport
+            { 7,  (50,  0) },   // Ice
+            { 8,  (70,  0) },   // Twister
+            { 9,  (110, 0) },   // Evil Spirit
+            { 10, (100, 0) },   // Hellfire
+            { 11, (5,   0) },   // Power Wave
+            { 12, (140, 0) },   // Aqua Beam
+            { 13, (150, 0) },   // Cometfall
+            { 14, (200, 0) },   // Inferno
+            { 15, (120, 0) },   // Teleport Ally
+            { 16, (70,  0) },   // Soul Barrier
+            { 17, (10,  0) },   // Energy Ball
+            { 40, (200, 22) },  // Nova
+            // Warrior
+            { 18, (30,  0) },   // Defense
+            { 19, (9,   4) },   // Falling Slash
+            { 20, (9,   4) },   // Lunge
+            { 21, (10,  4) },   // Uppercut
+            { 22, (12,  5) },   // Cyclone
+            { 23, (10,  4) },   // Slash
+            { 41, (40,  5) },   // Twisting Slash
+            { 42, (40,  5) },   // Rageful Blow
+            { 43, (40,  5) },   // Death Stab
+            { 44, (80,  10) },  // Crescent Moon Slash
+            { 45, (80,  10) },  // Lance
+            // Elf
+            { 24, (9,   4) },   // Triple Shot
+            { 26, (20,  0) },   // Heal
+            { 27, (80,  0) },   // Greater Defense
+            { 28, (80,  0) },   // Greater Damage
+            { 46, (50,  12) },  // Starfall
+            { 47, (9,   4) },   // Impale
+            { 48, (120, 0) },   // Swell Life
+            { 51, (40,  8) },   // Ice Arrow
+            { 52, (9,   4) },   // Penetration
+            // Dark Lord
+            { 55, (120, 12) },  // Fire Slash
+            { 56, (100, 10) },  // Power Slash
+            { 57, (90,  10) },  // Spiral Slash
+            { 60, (50,  5) },   // Force
+            { 61, (130, 15) },  // Fire Burst
+            { 62, (100, 10) },  // Earthshake
+            { 63, (200, 20) },  // Summon
+            { 64, (50,  5) },   // Increase Critical Damage
+            { 65, (100, 12) },  // Electric Spike
+            { 66, (90,  10) },  // Force Wave
+            { 67, (80,  8) },   // Stun
+            { 68, (50,  5) },   // Cancel Stun
+            { 69, (40,  0) },   // Swell Mana
+            { 70, (100, 10) },  // Invisibility
+            { 71, (50,  5) },   // Cancel Invisibility
+            { 72, (80,  8) },   // Abolish Magic
+            { 73, (120, 12) },  // Mana Rays
+            { 74, (130, 15) },  // Fire Blast
+            { 76, (300, 30) },  // Plasma Storm
+            { 77, (150, 15) },  // Infinity Arrow
+            { 78, (150, 18) },  // Fire Scream
+            { 79, (200, 20) },  // Explosion
+            // Summoner
+            { 214, (100, 10) }, // Drain Life
+            { 215, (140, 15) }, // Chain Lightning
+            { 217, (50,  5) },  // Damage Reflection
+            { 218, (100, 10) }, // Berserker
+            { 219, (80,  8) },  // Sleep
+            { 221, (80,  8) },  // Weakness
+            { 222, (80,  8) },  // Innovation
+            // Dark Lord extended
+            { 230, (150, 15) }, // Lightning Shock
+            { 232, (200, 20) }, // Strike of Destruction
+            { 233, (100, 0) },  // Expansion of Wizardry
+            { 234, (80,  0) },  // Recovery
+            { 235, (50,  12) }, // Multi-Shot
+            { 236, (130, 15) }, // Flame Strike
+            { 237, (250, 25) }, // Gigantic Storm
+            { 238, (200, 20) }, // Chaotic Diseier
+            // Rage Fighter
+            { 260, (50,  5) },  // Killing Blow
+            { 261, (50,  5) },  // Beast Uppercut
+            { 262, (80,  8) },  // Chain Drive
+            { 263, (100, 10) }, // Dark Side
+            { 264, (120, 12) }, // Dragon Roar
+            { 265, (150, 15) }, // Dragon Slasher
+            { 266, (50,  0) },  // Ignore Defense
+            { 267, (50,  0) },  // Increase Health
+            { 268, (50,  0) },  // Increase Block
+            { 269, (80,  8) },  // Charge
+            { 270, (120, 12) }, // Phoenix Shot
+        };
+
+        public static bool TryGetHardcodedCosts(int skillId, out ushort mana, out ushort ag)
+        {
+            if (HardcodedSkillCosts.TryGetValue(skillId, out var c)) { mana = c.Mana; ag = c.AG; return true; }
+            mana = 0; ag = 0; return false;
+        }
+
+        /// <summary>
         /// Hardcoded English skill names used as fallback when skill.bmd is not available.
         /// </summary>
         public static readonly IReadOnlyDictionary<int, string> HardcodedSkillNames = new Dictionary<int, string>

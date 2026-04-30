@@ -96,16 +96,22 @@ namespace Client.Main.Core.Utilities
         public static IReadOnlyDictionary<int, SkillBMD> GetAllSkills() => _skillDefinitions;
 
         /// <summary>
-        /// Gets skill mana cost.
+        /// Gets skill mana cost. Hardcoded values take priority — BMD parser returns incorrect costs for many skills.
         /// </summary>
-        public static ushort GetSkillManaCost(int skillId) =>
-            GetSkillDefinition(skillId)?.ManaCost ?? 0;
+        public static ushort GetSkillManaCost(int skillId)
+        {
+            if (SkillDefinitions.TryGetHardcodedCosts(skillId, out var mana, out _)) return mana;
+            return GetSkillDefinition(skillId)?.ManaCost ?? 0;
+        }
 
         /// <summary>
-        /// Gets skill AG cost.
+        /// Gets skill AG cost. Hardcoded values take priority — BMD parser returns incorrect costs for many skills.
         /// </summary>
-        public static ushort GetSkillAGCost(int skillId) =>
-            GetSkillDefinition(skillId)?.AbilityGaugeCost ?? 0;
+        public static ushort GetSkillAGCost(int skillId)
+        {
+            if (SkillDefinitions.TryGetHardcodedCosts(skillId, out _, out var ag)) return ag;
+            return GetSkillDefinition(skillId)?.AbilityGaugeCost ?? 0;
+        }
 
         /// <summary>
         /// Gets skill range/distance.
