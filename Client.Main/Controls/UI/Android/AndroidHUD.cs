@@ -248,6 +248,8 @@ namespace Client.Main.Controls.UI.Android
                 Console.WriteLine($"[HUD] TargetTap: skillId={skillId} ctrl={_skillController != null} monster={monster?.NetworkId.ToString() ?? "NULL"}");
                 if (monster != null)
                 {
+                    // Clear any stale cooldown — explicit user tap should always fire
+                    _skillController?.ClearSkillCooldown((ushort)skillId);
                     var result = false;
                     try { result = _skillController.AndroidUseSkillOnMonster(_pendingTargetSkill, monster); } catch (Exception ex) { Console.WriteLine($"[HUD] SkillError: {ex.Message}"); }
                     Console.WriteLine($"[HUD] UseSkillResult={result}");

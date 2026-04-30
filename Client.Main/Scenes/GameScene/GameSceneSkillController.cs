@@ -77,6 +77,16 @@ namespace Client.Main.Scenes
             return UseSkillOnTarget(skill, monster);
         }
 
+        /// <summary>
+        /// Explicit user tap: clear any stale cooldown so the skill always fires on intentional input.
+        /// Called by AndroidHUD before AndroidUseSkillOnMonster.
+        /// </summary>
+        public void ClearSkillCooldown(ushort skillId)
+        {
+            _nextSkillAllowedMs.Remove(skillId);
+            Console.WriteLine($"[Skill] ClearSkillCooldown: skill={skillId}");
+        }
+
         /// <summary>Blocks the game's own mouse/touch click handlers this frame (prevents auto-attack on same tap).</summary>
         public void ConsumeMouseInput() => _scene.SetMouseInputConsumed();
 
@@ -601,7 +611,9 @@ namespace Client.Main.Scenes
 
             if (!TryConsumeSkillDelay(skill.SkillId))
             {
-                Console.WriteLine($"[Skill] TryBeginSkillCast FAIL: cooldown, skill={skill.SkillId}");
+                double remaining = 0;
+                if (_nextSkillAllowedMs.TryGetValue(skill.SkillId, out double na)) remaining = na - GetNowMs();
+                Console.WriteLine($"[Skill] TryBeginSkillCast FAIL: cooldown, skill={skill.SkillId} remaining={remaining:F0}ms");
                 return false;
             }
 
