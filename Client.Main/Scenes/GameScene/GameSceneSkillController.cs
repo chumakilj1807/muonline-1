@@ -80,6 +80,24 @@ namespace Client.Main.Scenes
         /// <summary>Blocks the game's own mouse/touch click handlers this frame (prevents auto-attack on same tap).</summary>
         public void ConsumeMouseInput() => _scene.SetMouseInputConsumed();
 
+        /// <summary>Returns the nearest alive monster to the hero, or null if none.</summary>
+        public MonsterObject GetNearestMonsterToHero()
+        {
+            var hero = _scene.Hero;
+            if (hero == null) return null;
+            if (_scene.World is not WorldControl world) return null;
+
+            MonsterObject best = null;
+            float bestDist = float.MaxValue;
+            foreach (var monster in world.Monsters)
+            {
+                if (monster == null || monster.IsDead) continue;
+                float d = Vector2.Distance(hero.Location, monster.Location);
+                if (d < bestDist) { bestDist = d; best = monster; }
+            }
+            return best;
+        }
+
         /// <summary>Called by Android UI to fire a targeted skill at nearest enemy.</summary>
         public bool AndroidUseSkillOnNearestTarget(Core.Client.SkillEntryState skill)
         {

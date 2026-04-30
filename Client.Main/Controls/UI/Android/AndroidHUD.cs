@@ -172,14 +172,39 @@ namespace Client.Main.Controls.UI.Android
 
             if (skills.Count == 0) return;
 
-            // Sort: Area/Target first (offensive), then Self (buffs)
-            var ordered = skills
-                .OrderBy(s => SkillDefinitions.GetSkillType(s.SkillId) == SkillType.Self ? 1 : 0)
-                .ThenBy(s => s.SkillId)
-                .ToList();
-
-            for (int i = 0; i < 4 && i < ordered.Count; i++)
-                _skillBar.AssignSkill(ordered[i], i);
+            // For DL: preferred slot order (slot 0 = Fire Burst, then Area skills, then Target, then Self)
+            bool isDLForSlots = IsDarkLordSkillSet(skills, state.Class);
+            if (isDLForSlots)
+            {
+                // Preferred DL slot order: Fire Burst → Fire Slash → Earthshake → Electric Spike → rest
+                ushort[] dlPreferred = { 61, 55, 62, 65, 56, 78, 238, 66, 57, 79, 230, 237, 21, 22, 19, 20 };
+                int slot = 0;
+                var remaining = new System.Collections.Generic.List<SkillEntryState>(skills);
+                foreach (var wantedId in dlPreferred)
+                {
+                    if (slot >= 4) break;
+                    var s = remaining.FirstOrDefault(x => x.SkillId == wantedId);
+                    if (s != null) { _skillBar.AssignSkill(s, slot++); remaining.Remove(s); }
+                }
+                // Fill remaining slots with whatever's left (offensive first)
+                var rest = remaining
+                    .OrderBy(s => SkillDefinitions.GetSkillType(s.SkillId) == SkillType.Self ? 1 : 0)
+                    .ThenBy(s => s.SkillId);
+                foreach (var s in rest)
+                {
+                    if (slot >= 4) break;
+                    _skillBar.AssignSkill(s, slot++);
+                }
+            }
+            else
+            {
+                var ordered = skills
+                    .OrderBy(s => SkillDefinitions.GetSkillType(s.SkillId) == SkillType.Self ? 1 : 0)
+                    .ThenBy(s => s.SkillId)
+                    .ToList();
+                for (int i = 0; i < 4 && i < ordered.Count; i++)
+                    _skillBar.AssignSkill(ordered[i], i);
+            }
 
             _slotsAutoPopulated = true;
         }
@@ -207,67 +232,21 @@ namespace Client.Main.Controls.UI.Android
                 _targetTouchConsumedId = touch.Id;
                 _skillController?.ConsumeMouseInput();
 
-                var vp = MuGame.Instance.GraphicsDevice.Viewport;
-                // Tap on the cancel banner at top = cancel
+                // Tap on the cancel banner at top = cancel without firing
                 if (touch.Position.Y < 80)
                 {
                     _pendingTargetSkill = null;
                     return;
                 }
 
-                // Try screen-projection hit-test, fall back to nearest monster to hero
-                var monster = FindMonsterNearScreenPos(touch.Position, vp)
-                           ?? FindNearestMonsterToHero();
+                // Use skill controller's path — same as AndroidUseSkillOnNearestTarget which works
+                var monster = _skillController?.GetNearestMonsterToHero();
                 if (monster != null)
                     InvokeDirectSkillOnMonster(_pendingTargetSkill, monster);
 
                 _pendingTargetSkill = null;
                 return;
             }
-        }
-
-        private MonsterObject FindMonsterNearScreenPos(Vector2 screenPos, Microsoft.Xna.Framework.Graphics.Viewport vp)
-        {
-            if (MuGame.Instance.ActiveScene is not Scenes.GameScene gs) return null;
-            if (gs.World is not Controls.WorldControl world) return null;
-            if (world.Monsters.Count == 0) return null;
-
-            var cam = Camera.Instance;
-            // Use half screen width as max distance — very generous
-            float maxDist2 = (vp.Width * 0.5f) * (vp.Width * 0.5f);
-
-            MonsterObject best = null;
-            float bestDist = maxDist2;
-
-            foreach (var monster in world.Monsters)
-            {
-                if (monster == null || monster.IsDead) continue;
-                var screen = vp.Project(monster.Position, cam.Projection, cam.View, Matrix.Identity);
-                if (screen.Z < 0 || screen.Z > 1) continue;
-                float dx = screen.X - screenPos.X;
-                float dy = screen.Y - screenPos.Y;
-                float d2 = dx * dx + dy * dy;
-                if (d2 < bestDist) { bestDist = d2; best = monster; }
-            }
-            return best;
-        }
-
-        private MonsterObject FindNearestMonsterToHero()
-        {
-            if (MuGame.Instance.ActiveScene is not Scenes.GameScene gs) return null;
-            if (gs.World is not Controls.WorldControl world) return null;
-            var hero = gs.Hero;
-            if (hero == null) return null;
-
-            MonsterObject best = null;
-            float bestDist = float.MaxValue;
-            foreach (var monster in world.Monsters)
-            {
-                if (monster == null || monster.IsDead) continue;
-                float d = Vector2.Distance(hero.Location, monster.Location);
-                if (d < bestDist) { bestDist = d; best = monster; }
-            }
-            return best;
         }
 
         public override void Update(GameTime gameTime)
