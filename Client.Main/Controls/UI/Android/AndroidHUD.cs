@@ -139,8 +139,8 @@ namespace Client.Main.Controls.UI.Android
         /// Priority: offensive skills first (Area/Target), then Self buffs.
         /// Called once after character skills arrive from server.
         /// </summary>
-        // Warrior skills injected for DL
-        private static readonly ushort[] DarkLordWarriorSkills = { 21, 22, 19, 20, 18 };
+        // DL-specific skills that server might not send at low level but DL always has access to
+        private static readonly ushort[] DarkLordExtraSkills = { 55, 62, 65, 78 };
 
         private static bool IsDarkLordSkillSet(System.Collections.Generic.List<SkillEntryState> skills,
             MUnique.OpenMU.Network.Packets.CharacterClassNumber cls)
@@ -161,11 +161,11 @@ namespace Client.Main.Controls.UI.Android
 
             var skills = state.GetSkills().ToList();
 
-            // Inject warrior skills for DL; do BEFORE count check so DL gets slots even with 0 server skills
+            // Inject DL-specific skills that server might not send at low level
             if (IsDarkLordSkillSet(skills, state.Class))
             {
                 var existingIds = new System.Collections.Generic.HashSet<ushort>(skills.Select(s => s.SkillId));
-                foreach (var sid in DarkLordWarriorSkills)
+                foreach (var sid in DarkLordExtraSkills)
                     if (!existingIds.Contains(sid))
                         skills.Add(new SkillEntryState { SkillId = sid, SkillLevel = 1 });
             }
@@ -176,8 +176,8 @@ namespace Client.Main.Controls.UI.Android
             bool isDLForSlots = IsDarkLordSkillSet(skills, state.Class);
             if (isDLForSlots)
             {
-                // Preferred DL slot order: Fire Burst → Fire Slash → Earthshake → Electric Spike → rest
-                ushort[] dlPreferred = { 61, 55, 62, 65, 56, 78, 238, 66, 57, 79, 230, 237, 21, 22, 19, 20 };
+                // Preferred DL slot order: Fire Burst(target) → Fire Slash(area) → Earthshake(area) → Electric Spike(target)
+                ushort[] dlPreferred = { 61, 55, 62, 65, 56, 78, 238, 66, 57, 79, 230, 237 };
                 int slot = 0;
                 var remaining = new System.Collections.Generic.List<SkillEntryState>(skills);
                 foreach (var wantedId in dlPreferred)

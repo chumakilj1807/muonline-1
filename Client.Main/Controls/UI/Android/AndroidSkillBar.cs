@@ -67,16 +67,22 @@ namespace Client.Main.Controls.UI.Android
             var touches = MuGame.Instance.Touch;
             foreach (var touch in touches)
             {
-                if (AndroidHUD.ConsumedTouchIds.Contains(touch.Id)) continue;
                 if (touch.State != TouchLocationState.Pressed) continue;
-
+                bool consumed = AndroidHUD.ConsumedTouchIds.Contains(touch.Id);
                 var pos = touch.Position;
+                // Log every press so we can see coordinates vs slot positions
+                Console.WriteLine($"[Bar] press id={touch.Id} pos=({pos.X:F0},{pos.Y:F0}) consumed={consumed}");
+                for (int i = 0; i < 4; i++)
+                    Console.WriteLine($"[Bar]   slot{i} center=({_slotCenters[i].X:F0},{_slotCenters[i].Y:F0}) r={_slotRadii[i]:F0}");
+                if (consumed) continue;
+
                 for (int i = 0; i < 4; i++)
                 {
                     float dx = pos.X - _slotCenters[i].X;
                     float dy = pos.Y - _slotCenters[i].Y;
                     if (dx * dx + dy * dy <= _slotRadii[i] * _slotRadii[i])
                     {
+                        Console.WriteLine($"[Bar] HIT slot{i}");
                         AndroidHUD.ConsumedTouchIds.Add(touch.Id);
                         _flashTimer[i] = FlashDurationMs;
                         try { OnSlotTapped(i); } catch { }

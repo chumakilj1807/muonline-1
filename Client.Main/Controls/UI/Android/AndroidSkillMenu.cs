@@ -71,8 +71,8 @@ namespace Client.Main.Controls.UI.Android
             _awaitingSlotChoice = false;
         }
 
-        // Warrior skills injected for DL
-        private static readonly ushort[] DarkLordWarriorSkills = { 18, 19, 20, 21, 22 };
+        // DL-specific skills to show in menu even if server hasn't sent them at low level
+        private static readonly ushort[] DarkLordExtraSkills = { 55, 62, 65, 78 };
 
         private static bool IsDarkLord(CharacterClassNumber cls, IEnumerable<SkillEntryState> skills)
         {
@@ -97,10 +97,10 @@ namespace Client.Main.Controls.UI.Android
                 AddSkillItem(skill);
             }
 
-            // Inject warrior skills for Dark Lord if not already present
+            // Inject DL-specific skills if server hasn't sent them yet
             if (IsDarkLord(state.Class, serverSkills))
             {
-                foreach (var sid in DarkLordWarriorSkills)
+                foreach (var sid in DarkLordExtraSkills)
                 {
                     if (!existingIds.Contains(sid))
                         AddSkillItem(new SkillEntryState { SkillId = sid, SkillLevel = 1 });

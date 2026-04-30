@@ -1502,10 +1502,14 @@ namespace Client.Main.Objects.Player
         public PlayerAction GetSkillAction(ushort skillId, bool isInSafeZone)
         {
             int animationId = SkillDatabase.GetSkillAnimation(skillId);
+            int actionCount = Model?.Actions?.Length ?? 0;
+            Console.WriteLine($"[Anim] skill={skillId} animId={animationId} modelActions={actionCount}");
             if (animationId > 0 && (Model?.Actions == null || animationId < Model.Actions.Length))
                 return (PlayerAction)animationId;
 
-            return GetDefaultSkillAction(isInSafeZone);
+            var fallback = GetDefaultSkillAction(isInSafeZone);
+            Console.WriteLine($"[Anim] fallback={fallback}");
+            return fallback;
         }
 
         private PlayerAction GetDefaultSkillAction(bool isInSafeZone)
