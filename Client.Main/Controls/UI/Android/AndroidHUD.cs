@@ -204,12 +204,20 @@ namespace Client.Main.Controls.UI.Android
                 if (touch.State != TouchLocationState.Pressed) continue;
 
                 AndroidHUD.ConsumedTouchIds.Add(touch.Id);
-                _targetTouchConsumedId = touch.Id; // keep consuming this touch in next frames
-
-                // Block game's own click handler (prevents auto-attack on same tap)
+                _targetTouchConsumedId = touch.Id;
                 _skillController?.ConsumeMouseInput();
 
-                var monster = FindMonsterAtScreen(touch.Position);
+                var vp = MuGame.Instance.GraphicsDevice.Viewport;
+                // Tap on the cancel banner at top = cancel
+                if (touch.Position.Y < 80)
+                {
+                    _pendingTargetSkill = null;
+                    return;
+                }
+
+                // Try screen-projection hit-test, fall back to nearest monster to hero
+                var monster = FindMonsterNearScreenPos(touch.Position, vp)
+                           ?? FindNearestMonsterToHero();
                 if (monster != null)
                     InvokeDirectSkillOnMonster(_pendingTargetSkill, monster);
 
@@ -218,28 +226,47 @@ namespace Client.Main.Controls.UI.Android
             }
         }
 
-        private MonsterObject FindMonsterAtScreen(Vector2 screenPos)
+        private MonsterObject FindMonsterNearScreenPos(Vector2 screenPos, Microsoft.Xna.Framework.Graphics.Viewport vp)
         {
             if (MuGame.Instance.ActiveScene is not Scenes.GameScene gs) return null;
             if (gs.World is not Controls.WorldControl world) return null;
+            if (world.Monsters.Count == 0) return null;
 
             var cam = Camera.Instance;
-            var vp = MuGame.Instance.GraphicsDevice.Viewport;
-            const float MaxDistPx = 200f;
+            // Use half screen width as max distance — very generous
+            float maxDist2 = (vp.Width * 0.5f) * (vp.Width * 0.5f);
 
             MonsterObject best = null;
-            float bestDist = MaxDistPx * MaxDistPx;
+            float bestDist = maxDist2;
 
             foreach (var monster in world.Monsters)
             {
                 if (monster == null || monster.IsDead) continue;
                 var screen = vp.Project(monster.Position, cam.Projection, cam.View, Matrix.Identity);
+                if (screen.Z < 0 || screen.Z > 1) continue;
                 float dx = screen.X - screenPos.X;
                 float dy = screen.Y - screenPos.Y;
                 float d2 = dx * dx + dy * dy;
                 if (d2 < bestDist) { bestDist = d2; best = monster; }
             }
+            return best;
+        }
 
+        private MonsterObject FindNearestMonsterToHero()
+        {
+            if (MuGame.Instance.ActiveScene is not Scenes.GameScene gs) return null;
+            if (gs.World is not Controls.WorldControl world) return null;
+            var hero = gs.Hero;
+            if (hero == null) return null;
+
+            MonsterObject best = null;
+            float bestDist = float.MaxValue;
+            foreach (var monster in world.Monsters)
+            {
+                if (monster == null || monster.IsDead) continue;
+                float d = Vector2.Distance(hero.Location, monster.Location);
+                if (d < bestDist) { bestDist = d; best = monster; }
+            }
             return best;
         }
 
