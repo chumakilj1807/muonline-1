@@ -5,7 +5,7 @@ using Microsoft.Xna.Framework;
 namespace Client.Main.Objects.Effects.Skills
 {
     /// <summary>
-    /// Dark Lord's Force (ID 60) — golden energy ring expanding from caster.
+    /// Dark Lord's Force (ID 60) — expanding force wave from caster (WaveForce.bmd + impact_force.bmd).
     /// </summary>
     [SkillVisualEffect(60)]
     public sealed class ForceSkillEffect : ISkillVisualEffect
@@ -22,7 +22,7 @@ namespace Client.Main.Objects.Effects.Skills
                 center = new Vector3(center.X, center.Y, gz);
             }
 
-            return new DarkLordForceEffect(center);
+            return new DarkLordForceWaveEffect(center);
         }
     }
 }

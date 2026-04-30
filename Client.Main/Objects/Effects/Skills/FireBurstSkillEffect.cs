@@ -7,7 +7,7 @@ using Microsoft.Xna.Framework;
 namespace Client.Main.Objects.Effects.Skills
 {
     /// <summary>
-    /// Dark Lord's Fire Burst (ID 61) — multiple fire chains radiating from caster toward target.
+    /// Dark Lord's Fire Burst (ID 61) — fire orb at target (DarkLordSkill.bmd).
     /// </summary>
     [SkillVisualEffect(61)]
     public sealed class FireBurstSkillEffect : ISkillVisualEffect
@@ -17,20 +17,20 @@ namespace Client.Main.Objects.Effects.Skills
             if (context.Caster == null || context.World == null)
                 return null;
 
-            var caster = context.Caster;
-            var world  = context.World;
+            var world = context.World;
+            Vector3 center;
 
-            Vector3 start = caster is PlayerObject player
-                && player.TryGetHandWorldMatrix(isLeftHand: false, out var hand)
-                ? hand.Translation + new Vector3(0f, 0f, 20f)
-                : caster.WorldPosition.Translation + Vector3.UnitZ * 80f;
+            if (context.TargetId != 0 && world.TryGetWalkerById(context.TargetId, out var t))
+                center = t.WorldPosition.Translation + Vector3.UnitZ * 60f;
+            else
+            {
+                float az = context.Caster.Angle.Z;
+                center = context.Caster.WorldPosition.Translation
+                       + new Vector3(MathF.Cos(az) * 280f, MathF.Sin(az) * 280f, 60f);
+            }
 
-            Vector3 target = context.TargetId != 0
-                && world.TryGetWalkerById(context.TargetId, out var t)
-                ? t.WorldPosition.Translation + Vector3.UnitZ * 60f
-                : start + new Vector3(MathF.Cos(caster.Angle.Z) * 280f, MathF.Sin(caster.Angle.Z) * 280f, 0f);
-
-            return new DarkLordFireChainEffect(start, target);
+            float angle = context.Caster.Angle.Z;
+            return new DarkLordSkillEffect(center, count: 1, spread: 0f, startAngle: angle);
         }
     }
 }

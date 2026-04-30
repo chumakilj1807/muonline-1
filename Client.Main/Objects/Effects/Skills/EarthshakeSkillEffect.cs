@@ -6,10 +6,10 @@ using Microsoft.Xna.Framework;
 namespace Client.Main.Objects.Effects.Skills
 {
     /// <summary>
-    /// Dark Lord's Fire Slash (ID 55) — fire pillars at target area (darkfirescrem01.bmd).
+    /// Dark Lord's Earthshake (ID 62) — ground eruptions at target area (EarthQuake01-08.bmd).
     /// </summary>
-    [SkillVisualEffect(55)]
-    public sealed class FireSlashSkillEffect : ISkillVisualEffect
+    [SkillVisualEffect(62)]
+    public sealed class EarthshakeSkillEffect : ISkillVisualEffect
     {
         public WorldObject? CreateEffect(SkillEffectContext context)
         {
@@ -27,7 +27,7 @@ namespace Client.Main.Objects.Effects.Skills
             {
                 float az = context.Caster.Angle.Z;
                 center = context.Caster.WorldPosition.Translation
-                       + new Vector3(MathF.Cos(az) * 160f, MathF.Sin(az) * 160f, 0f);
+                       + new Vector3(MathF.Cos(az) * 200f, MathF.Sin(az) * 200f, 0f);
             }
 
             if (world.Terrain != null)
@@ -36,8 +36,7 @@ namespace Client.Main.Objects.Effects.Skills
                 center = new Vector3(center.X, center.Y, gz);
             }
 
-            // Fire Slash: 5 pillars in a ring, radius 100
-            return new DarkLordFireScreamEffect(center, pillarCount: 5, radius: 100f, addGroundFire: false);
+            return new DarkLordEarthshakeEffect(center);
         }
     }
 }
