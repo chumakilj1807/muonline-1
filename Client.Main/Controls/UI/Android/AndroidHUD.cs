@@ -240,9 +240,15 @@ namespace Client.Main.Controls.UI.Android
                 }
 
                 // Use skill controller's path — same as AndroidUseSkillOnNearestTarget which works
+                var skillId = _pendingTargetSkill?.SkillId ?? 0;
                 var monster = _skillController?.GetNearestMonsterToHero();
+                Console.WriteLine($"[HUD] TargetTap: skillId={skillId} ctrl={_skillController != null} monster={monster?.NetworkId.ToString() ?? "NULL"}");
                 if (monster != null)
-                    InvokeDirectSkillOnMonster(_pendingTargetSkill, monster);
+                {
+                    var result = false;
+                    try { result = _skillController.AndroidUseSkillOnMonster(_pendingTargetSkill, monster); } catch (Exception ex) { Console.WriteLine($"[HUD] SkillError: {ex.Message}"); }
+                    Console.WriteLine($"[HUD] UseSkillResult={result}");
+                }
 
                 _pendingTargetSkill = null;
                 return;

@@ -594,10 +594,16 @@ namespace Client.Main.Scenes
         private bool TryBeginSkillCast(Core.Client.SkillEntryState skill, PlayerObject hero)
         {
             if (hero.IsAttackOrSkillAnimationPlaying())
+            {
+                Console.WriteLine($"[Skill] TryBeginSkillCast FAIL: animation playing, skill={skill.SkillId}");
                 return false;
+            }
 
             if (!TryConsumeSkillDelay(skill.SkillId))
+            {
+                Console.WriteLine($"[Skill] TryBeginSkillCast FAIL: cooldown, skill={skill.SkillId}");
                 return false;
+            }
 
             // Check if player has enough mana and AG to use the skill
             var characterState = MuGame.Network?.GetCharacterState();
