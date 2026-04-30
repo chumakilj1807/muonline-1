@@ -617,20 +617,21 @@ namespace Client.Main.Scenes
                 return false;
             }
 
-            // Check if player has enough mana and AG to use the skill
+            // Check if player has enough mana and AG to use the skill.
+            // Skip if cost > 9999 — BMD parser returns corrupt values for some skills (e.g. DL skill 61 → 25651).
             var characterState = MuGame.Network?.GetCharacterState();
             if (characterState != null)
             {
                 ushort manaCost = SkillDatabase.GetSkillManaCost(skill.SkillId);
                 ushort agCost = SkillDatabase.GetSkillAGCost(skill.SkillId);
 
-                if (characterState.CurrentMana < manaCost)
+                if (manaCost > 0 && manaCost < 9999 && characterState.CurrentMana < manaCost)
                 {
                     Console.WriteLine($"[Skill] TryBeginSkillCast FAIL: mana, skill={skill.SkillId} need={manaCost} have={characterState.CurrentMana}");
                     return false;
                 }
 
-                if (characterState.CurrentAbility < agCost)
+                if (agCost > 0 && agCost < 9999 && characterState.CurrentAbility < agCost)
                 {
                     Console.WriteLine($"[Skill] TryBeginSkillCast FAIL: AG, skill={skill.SkillId} need={agCost} have={characterState.CurrentAbility}");
                     return false;
