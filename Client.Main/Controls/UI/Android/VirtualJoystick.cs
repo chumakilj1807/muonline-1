@@ -63,7 +63,7 @@ namespace Client.Main.Controls.UI.Android
             bool found = false;
             foreach (var touch in touches)
             {
-                var pos = touch.Position;
+                var pos = AndroidHUD.ScaleTouchPos(touch.Position);
 
                 if (touch.Id == _activeTouchId)
                 {

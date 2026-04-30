@@ -235,8 +235,9 @@ namespace Client.Main.Controls.UI.Android
                 _targetTouchConsumedId = touch.Id;
                 _skillController?.ConsumeMouseInput();
 
+                var scaledPos = ScaleTouchPos(touch.Position);
                 // Tap on the cancel banner at top = cancel without firing
-                if (touch.Position.Y < 80)
+                if (scaledPos.Y < 80)
                 {
                     _pendingTargetSkill = null;
                     return;
@@ -421,6 +422,17 @@ namespace Client.Main.Controls.UI.Android
         {
             if (_skillController == null) return;
             _skillController.AndroidUseSelfSkill(skill);
+        }
+
+        /// <summary>Converts touch position (logical/DIP pixels) to physical pixels matching the viewport.</summary>
+        public static Vector2 ScaleTouchPos(Vector2 touchPos)
+        {
+            var vp = MuGame.Instance.GraphicsDevice.Viewport;
+            int displayW = TouchPanel.DisplayWidth;
+            int displayH = TouchPanel.DisplayHeight;
+            float scaleX = displayW > 0 && displayW != vp.Width ? vp.Width / (float)displayW : 1f;
+            float scaleY = displayH > 0 && displayH != vp.Height ? vp.Height / (float)displayH : 1f;
+            return new Vector2(touchPos.X * scaleX, touchPos.Y * scaleY);
         }
 
         public override void Dispose()

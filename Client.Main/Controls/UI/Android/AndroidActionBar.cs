@@ -72,7 +72,7 @@ namespace Client.Main.Controls.UI.Android
                 if (AndroidHUD.ConsumedTouchIds.Contains(touch.Id)) continue;
                 if (touch.State != TouchLocationState.Pressed) continue;
 
-                var pos = touch.Position;
+                var pos = AndroidHUD.ScaleTouchPos(touch.Position);
                 for (int i = 0; i < 6; i++)
                 {
                     float dx = pos.X - _centers[i].X;

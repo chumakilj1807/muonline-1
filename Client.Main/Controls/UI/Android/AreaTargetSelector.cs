@@ -78,7 +78,7 @@ namespace Client.Main.Controls.UI.Android
             {
                 if (AndroidHUD.ConsumedTouchIds.Contains(touch.Id)) continue;
 
-                var pos = touch.Position;
+                var pos = AndroidHUD.ScaleTouchPos(touch.Position);
 
                 if (touch.State == TouchLocationState.Pressed)
                 {
