@@ -626,15 +626,13 @@ namespace Client.Main.Scenes
 
                 if (characterState.CurrentMana < manaCost)
                 {
-                    _logger?.LogDebug("Not enough mana to use skill {SkillId}. Required: {Required}, Current: {Current}",
-                        skill.SkillId, manaCost, characterState.CurrentMana);
+                    Console.WriteLine($"[Skill] TryBeginSkillCast FAIL: mana, skill={skill.SkillId} need={manaCost} have={characterState.CurrentMana}");
                     return false;
                 }
 
                 if (characterState.CurrentAbility < agCost)
                 {
-                    _logger?.LogDebug("Not enough AG to use skill {SkillId}. Required: {Required}, Current: {Current}",
-                        skill.SkillId, agCost, characterState.CurrentAbility);
+                    Console.WriteLine($"[Skill] TryBeginSkillCast FAIL: AG, skill={skill.SkillId} need={agCost} have={characterState.CurrentAbility}");
                     return false;
                 }
             }
